@@ -183,15 +183,16 @@ health-check:
 
 dockerness:
 	@echo "====== CONTAINERS ======="
-	docker ps -a --format "table {{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}"
+	@docker ps -a --format "table {{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}"
 	@echo "====== VOLUMES =========="
-	docker volume ls --format "table {{.Name}}\t{{.Driver}}"
+	@docker volume ls --format "table {{.Name}}\t{{.Driver}}"
 	@echo "====== NETWORKS ========="
-	docker network ls --format "table {{.Name}}\t{{.Driver}}"
+	@docker network ls --format "table {{.Name}}\t{{.Driver}}"
 	@echo "====== IMAGES ==========="
-	docker images --format "table {{.Repository}}\t{{.Tag}}\t{{.ID}}\t{{.Size}}"
+	@docker images --format "table {{.Repository}}\t{{.Tag}}\t{{.ID}}\t{{.Size}}"
 	@echo "====== HEALTH CHECK ====="
-	docker inspect --format='{{.Name}}: {{.State.Health.Status}}' $(docker ps -q)
+	@docker inspect --format='{{.Name}}: {{.State.Health.Status}}' $(docker ps -q)
 
+	
 lazydocker:
 	docker run --rm -it -v /var/run/docker.sock:/var/run/docker.sock -v /your/config:/.config/jesseduffield/lazydocker lazyteam/lazydocker
