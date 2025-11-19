@@ -1,0 +1,33 @@
+{
+    "transactions": [],
+    "subscriptions": [],
+    "authorizations": [],
+    "first_name": "Williams",
+    "last_name": "Samuel",
+    "email": "williamusanga23@gmail.com",
+    "phone": "",
+    "metadata": {
+        "user_pub_id": "0427a207-b1ea-40fb-b308-99a5305cb4c3"
+    },
+    "domain": "test",
+    "customer_code": "CUS_f59eoseivw7vgir",
+    "risk_action": "default",
+    "id": 300901369,
+    "integration": 1280684,
+    "createdAt": "2025-08-21T22:03:07.000Z",
+    "updatedAt": "2025-09-09T01:49:22.000Z",
+    "created_at": "2025-08-21T22:03:07.000Z",
+    "updated_at": "2025-09-09T01:49:22.000Z",
+    "total_transactions": 0,
+    "total_transaction_value": [],
+    "dedicated_account": null,
+    "dedicated_accounts": [],
+    "identified": true,
+    "identifications": [
+        {
+            "country": "NG",
+            "type": "bank_account",
+            "value": "011****111"
+        }
+    ]
+}

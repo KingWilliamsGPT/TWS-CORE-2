@@ -1,0 +1,47 @@
+# python 3.12.7
+
+Django>=4.2,<5.0
+django-jet==1.0.8
+djangorestframework>=3.14.0
+django-filter>=23.2
+django-rest-passwordreset>=1.3.0
+# drf-yasg>=1.21.7
+easy-thumbnails>=2.8.5
+social-auth-app-django>=5.4.0
+django-cors-headers>=4.3.1
+# django-inlinecss==0.3.0  # 0.3.0 is not compatible with django 4.2\
+git+https://github.com/roverdotcom/django-inlinecss.git@master
+django-summernote>=0.8.20.0
+django-celery-beat>=2.5.0
+django-health-check>=3.17.0
+celery>=5.3.6
+sentry_sdk==2.33
+django-dotenv==1.4.2
+django-money==3.5.4
+djangorestframework-simplejwt==5.5.0
+django-activity-stream>=1.4.0  #2.0.0
+whitenoise==6.9.0
+ipython==9.4
+paystack_sdk==1.0.1
+gunicorn==23.0.0
+psycopg2-binary>=2.9  # oldey
+# psycopg-binary==3.2.9 # new
+pyotp>=2.9.0,<=3.5
+django-phonenumber-field>=8.0,<=8.5
+phonenumbers>=8.13,<=9.1
+qrcode>=8.1,<=8.9
+twilio>=9.6,<10.0
+pycryptodome>=3.23,<=3.30
+drf-spectacular==0.28.0
+drf-spectacular[sidecar]==0.28.0
+pyconstring>=1.0.0,<=1.4
+gspread==6.2.1
+google_auth==2.41.1
+gspread-formatting==1.2.1
+django-countries==7.6.1
+django-countries-plus==2.2.0
+django_cities_light==3.10.2
+channels==4.3.1
+daphne==4.2.1
+channels_redis==4.3.0
+django_redis==6.0.0
