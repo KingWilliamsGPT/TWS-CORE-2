@@ -195,7 +195,13 @@ dockerness:
 	@docker images --format "table {{.Repository}}\t{{.Tag}}\t{{.ID}}\t{{.Size}}"
 	@echo ""
 	@echo "====== HEALTH CHECK ====="
-	@docker inspect --format='{{.Name}}: {{.State.Health.Status}}' $(docker ps -q)
+	@containers=$$(docker ps -q); \
+	if [ -n "$$containers" ]; then \
+		docker inspect --format='{{.Name}}: {{.State.Health.Status}}' $$containers; \
+	else \
+		echo "No running containers"; \
+	fi
+
 
 	
 lazydocker:
