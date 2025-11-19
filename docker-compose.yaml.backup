@@ -1,18 +1,18 @@
 version: "3.8"
 
 volumes:
-  postgres_data:
-  static_volume:
-  media_volume:
+  ${COMPOSE_POSTGRES_VOLUME_NAME}:
+  ${COMPOSE_STATIC_VOLUME_NAME}:
+  ${COMPOSE_MEDIA_VOLUME_NAME}:
 
 networks:
-  app_network:
+  ${COMPOSE_NETWORK_NAME}:
     driver: bridge
 
 services:
-  django_app:
+  ${DJANGO_APP_CONTAINER}:
     build: .
-    container_name: django_app
+    container_name: ${DJANGO_APP_CONTAINER}
     command: >
       sh -c "
         python manage.py wait_for_db &&
@@ -23,23 +23,23 @@ services:
       "
     volumes:
       - ./:/app
-      - static_volume:/app/static
-      - media_volume:/app/media
+      - ${COMPOSE_STATIC_VOLUME_NAME}:/app/static
+      - ${COMPOSE_MEDIA_VOLUME_NAME}:/app/media
     env_file:
       - .env
     environment:
-      - DB_HOST=postgres
-      - REDIS_HOST=redis
+      - DB_HOST=${POSTGRES_CONTAINER}
+      - REDIS_HOST=${REDIS_CONTAINER}
       - DJANGO_SETTINGS_MODULE=src.config.local
     depends_on:
-      postgres:
+      ${POSTGRES_CONTAINER}:
         condition: service_healthy
-      redis:
+      ${REDIS_CONTAINER}:
         condition: service_started
     expose:
       - "9000"
     networks:
-      - app_network
+      - ${COMPOSE_NETWORK_NAME}
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:9000/api/v1/users/health/"]
@@ -48,17 +48,17 @@ services:
       retries: 3
       start_period: 30s
 
-  postgres:
+  ${POSTGRES_CONTAINER}:
     image: postgres:15
-    container_name: postgres
+    container_name: ${POSTGRES_CONTAINER}
     environment:
       - POSTGRES_DB=${DB_NAME}
       - POSTGRES_USER=${DB_USER}
       - POSTGRES_PASSWORD=${DB_PASSWORD}
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - ${COMPOSE_POSTGRES_VOLUME_NAME}:/var/lib/postgresql/data
     networks:
-      - app_network
+      - ${COMPOSE_NETWORK_NAME}
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
@@ -66,27 +66,27 @@ services:
       timeout: 5s
       retries: 5
 
-  redis:
+  ${REDIS_CONTAINER}:
     image: redis:7
-    container_name: redis
+    container_name: ${REDIS_CONTAINER}
     command: ["redis-server", "--appendonly", "yes"]
     networks:
-      - app_network
+      - ${COMPOSE_NETWORK_NAME}
     restart: unless-stopped
 
-  nginx:
+  ${NGINX_CONTAINER}:
     build:
       context: .
       dockerfile: nginx/Dockerfile
     depends_on:
-      django_app:
+      ${DJANGO_APP_CONTAINER}:
         condition: service_healthy
     ports:
       - "80:80"
       - "443:443"
     volumes:
-      - static_volume:/app/static
-      - media_volume:/app/media
+      - ${COMPOSE_STATIC_VOLUME_NAME}:/app/static
+      - ${COMPOSE_MEDIA_VOLUME_NAME}:/app/media
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf
       - ./nginx/conf.d:/etc/nginx/conf.d
       - ./certbot/conf:/etc/letsencrypt
@@ -94,21 +94,21 @@ services:
       - ./nginx/start-nginx.sh:/start-nginx.sh
     command: ["/bin/bash", "/start-nginx.sh"]
     networks:
-      - app_network
+      - ${COMPOSE_NETWORK_NAME}
     restart: unless-stopped
     environment:
-      - DOMAIN=api.zeefas.com
-    container_name: nginx
+      - DOMAIN=${DOMAIN}
+    container_name: ${NGINX_CONTAINER}
 
-  certbot:
+  ${CERTBOT_CONTAINER}:
     image: certbot/certbot
     volumes:
       - ./certbot/conf:/etc/letsencrypt
       - ./certbot/www:/var/www/certbot
     depends_on:
-      - nginx
+      - ${NGINX_CONTAINER}
     entrypoint: >
       /bin/sh -c 'trap exit TERM; while :; do certbot renew; sleep 12h & wait $${!}; done;'
     networks:
-      - app_network
-    container_name: certbot
+      - ${COMPOSE_NETWORK_NAME}
+    container_name: ${CERTBOT_CONTAINER}
