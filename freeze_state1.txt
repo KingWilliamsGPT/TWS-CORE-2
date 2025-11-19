@@ -40,7 +40,7 @@ django-health-check==3.20.0
 django-inlinecss @ git+https://github.com/roverdotcom/django-inlinecss.git@d69f93bbc241f372e5a27342d42948285cf1d97b
 django-jet==1.0.8
 django-money==3.5.4
-django-nose @ file:///C:/Users/USER/Desktop/code/TWS_CORE/TWS_CORE-backend/requirements/django_nose-1.4.7-py2.py3-none-any.whl#sha256=304adc447ee35b889b733d7106004f98aa401d8387ddcada5d4f2239d86790a9
+django-nose @ file:///C:/Users/USER/Desktop/code/zeefas/zeefas-backend/requirements/django_nose-1.4.7-py2.py3-none-any.whl#sha256=304adc447ee35b889b733d7106004f98aa401d8387ddcada5d4f2239d86790a9
 django-phonenumber-field==8.1.0
 django-rest-passwordreset==1.5.0
 django-summernote==0.8.20.0

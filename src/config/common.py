@@ -35,16 +35,16 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PREFERRED_DVA_BANK = "paystack-titan"  # OR wema-bank
 
 # SITE_URL = os.getenv('SITE_URL', 'http://localhost:8000')
-SITE_NAME = os.getenv("SITE_NAME", "TheBackend")
-SITE_URL = "https://thebackend.onrender.com/"
-FRONTEND_SERVER = "https://thebackend.com/"  # os.getenv('FRONTEND_SERVER', 'https://thebackend.com/')
+SITE_NAME = os.getenv("SITE_NAME", "zeefas")
+SITE_URL = "https://api.zeefas.com/"
+FRONTEND_SERVER = "https://zeefas.com/"  # os.getenv('FRONTEND_SERVER', 'https://zeefas.com/')
 DEVELOPER_EMAIL = "williamusanga23@gmail.com"
 
 DEVELOPER_EMAILS = [
     DEVELOPER_EMAIL,
 ]
 
-FRONTEND_DOMAIN = os.getenv("FRONTEND_DOMAIN", "https://thebackend.com")
+FRONTEND_DOMAIN = os.getenv("FRONTEND_DOMAIN", "https://zeefas.com")
 
 DISABLE_DVA_CHECKS = os.getenv("DISABLE_DVA_CHECKS", "False").lower() == "true"
 WHATSAPP_INVITE_LINK = "https://chat.whatsapp.com/JQU7KiHMKPs3Km6yuDhtWR"
@@ -579,8 +579,8 @@ REST_FRAMEWORK = {
 
 
 SPECTACULAR_SETTINGS = {
-    "TITLE": " TheBackend API",
-    "DESCRIPTION": "Backend API documentation for TheBackend",
+    "TITLE": " zeefas API",
+    "DESCRIPTION": "Backend API documentation for zeefas",
     "VERSION": "1.0.0",
     "SERVE_INCLUDE_SCHEMA": False,  # keeps /api/schema/ clean
 }

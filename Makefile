@@ -88,7 +88,7 @@ websocket:
 
 
 # ----------------------------------------------------------------------------------
-DOMAIN ?= TWS_CORE.com
+DOMAIN ?= api.zeefas.com
 EMAIL ?= williamusanga23@gmail.com
 COMPOSE_FILE ?= docker-compose.yaml
 

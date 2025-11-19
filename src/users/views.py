@@ -293,7 +293,7 @@ class UserViewSet(viewsets.GenericViewSet):
         ```json
         {
             "image_url": "/api/v1/users/qr_image_for_2fa/c06b6b7...ezEM/",
-            "qrcode_uri": "otpauth://totp/TheBackend:useremail@gmail.com?secret=BUN...S2&issuer=TheBackend"
+            "qrcode_uri": "otpauth://totp/zeefas:useremail@gmail.com?secret=BUN...S2&issuer=zeefas"
         }
         ```
         - use can `image_url` which will return the image in png (NOT RECOMMENDED: the link expires)

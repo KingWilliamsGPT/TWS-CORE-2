@@ -44,7 +44,7 @@ def get_current_domain(request):
 
 
 class WaitlistSpreadSheet:
-    GOOGLE_CREDENTIALS_FILE = "credentials/TWS_CORE.json"
+    GOOGLE_CREDENTIALS_FILE = "credentials/zeefas.json"
     SHEET_ID = "16k0JfWOxpubIY2JHSGO2i3k2KzCa0faUBpXRzx1mpnk"
 
     @classmethod
