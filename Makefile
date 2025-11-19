@@ -2,6 +2,9 @@
 -include makefiles/fail2ban.mk
 -include makefiles/vps.mk
 
+include .env
+export
+
 install_whl:
 	pip install requirements/django_nose-1.4.7-py2.py3-none-any.whl
 
@@ -88,21 +91,27 @@ websocket:
 
 
 # ----------------------------------------------------------------------------------
-DOMAIN ?= api.zeefas.com
-EMAIL ?= williamusanga23@gmail.com
-COMPOSE_FILE ?= docker-compose.yaml
+# THESE ARE ALL LOADED FROM .ENV
 
-# Container names
-CERTBOT_CONTAINER ?= certbot
-NGINX_CONTAINER ?= nginx
-POSTGRES_CONTAINER ?= postgres
-REDIS_CONTAINER ?= redis
-DJANGO_APP_CONTAINER ?= django_app
+# DOMAIN ?= api.zeefas.com
+# EMAIL ?= williamusanga23@gmail.com
+# COMPOSE_FILE ?= docker-compose.yaml
 
-# NETWORK
-NETWORK_NAME ?= app_network
+# # Container names
+# CERTBOT_CONTAINER ?= certbot
+# NGINX_CONTAINER ?= nginx
+# POSTGRES_CONTAINER ?= postgres
+# REDIS_CONTAINER ?= redis
+# DJANGO_APP_CONTAINER ?= django_app
 
-.PHONY: up certs restart https down help
+# # NETWORK
+# NETWORK_NAME ?= zeefas_app_network
+# POSTGRES_VOLUME_NAME ?= zeefas_postgres_data
+# STATIC_VOLUME_NAME ?= zeefas_static_volume
+# MEDIA_VOLUME_NAME ?= zeefas_media_volume
+
+.PHONY: up certs restart https down help setup-cert 
+
 
 up:
 	@echo "Starting initial run with HTTP only..."

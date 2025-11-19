@@ -5,7 +5,6 @@ import time
 import os
 from datetime import datetime, timedelta
 
-NGINX_CONTAINER = "nginx"
 ENV_PATH = '../.env'
 
 def load_env():
@@ -20,9 +19,8 @@ def load_env():
         print("❌ .env file not found", ex)
 
 
-# load_env()
-
-# NGINX_CONTAINER = f"{os.getenv('COMPOSE_PROJECT_NAME', 'zeefas')}_nginx"
+load_env()
+NGINX_CONTAINER = os.getenv("NGINX_CONTAINER", "nginx")
 
 def is_nginx_ready(timeout=10):
     """Check if Nginx is ready using only stdlib"""
