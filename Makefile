@@ -88,7 +88,6 @@ websocket:
 
 
 # ----------------------------------------------------------------------------------
-export COMPOSE_PROJECT_NAME=app
 DOMAIN ?= api.zeefas.com
 EMAIL ?= williamusanga23@gmail.com
 COMPOSE_FILE ?= docker-compose.yaml

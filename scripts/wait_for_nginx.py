@@ -2,9 +2,27 @@ import urllib.request
 import urllib.error
 import subprocess
 import time
+import os
 from datetime import datetime, timedelta
 
 NGINX_CONTAINER = "nginx"
+ENV_PATH = '../.env'
+
+def load_env():
+    """Load environment variables from .env file"""
+    try:
+        with open(ENV_PATH) as f:
+            for line in f:
+                if line.strip() and not line.startswith('#'):
+                    key, value = line.strip().split('=', 1)
+                    os.environ[key] = value
+    except FileNotFoundError as ex:
+        print("❌ .env file not found", ex)
+
+
+# load_env()
+
+# NGINX_CONTAINER = f"{os.getenv('COMPOSE_PROJECT_NAME', 'zeefas')}_nginx"
 
 def is_nginx_ready(timeout=10):
     """Check if Nginx is ready using only stdlib"""
