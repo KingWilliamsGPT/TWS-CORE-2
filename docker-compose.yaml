@@ -35,8 +35,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_started
-    ports:
-      - "9000:9000"
+    expose:
+      - "9000"
     networks:
       - app_network
     restart: unless-stopped
@@ -64,15 +64,11 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-    ports:
-      - "5432:5432"
 
   redis:
     image: redis:7
     container_name: redis
     command: ["redis-server", "--appendonly", "yes"]
-    ports:
-      - "6379:6379"
     networks:
       - app_network
     restart: unless-stopped
