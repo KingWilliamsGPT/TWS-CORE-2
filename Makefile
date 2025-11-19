@@ -184,12 +184,16 @@ health-check:
 dockerness:
 	@echo "====== CONTAINERS ======="
 	@docker ps -a --format "table {{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}"
+	@echo ""
 	@echo "====== VOLUMES =========="
 	@docker volume ls --format "table {{.Name}}\t{{.Driver}}"
+	@echo ""
 	@echo "====== NETWORKS ========="
 	@docker network ls --format "table {{.Name}}\t{{.Driver}}"
+	@echo ""
 	@echo "====== IMAGES ==========="
 	@docker images --format "table {{.Repository}}\t{{.Tag}}\t{{.ID}}\t{{.Size}}"
+	@echo ""
 	@echo "====== HEALTH CHECK ====="
 	@docker inspect --format='{{.Name}}: {{.State.Health.Status}}' $(docker ps -q)
 
