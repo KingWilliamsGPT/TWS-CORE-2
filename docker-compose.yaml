@@ -98,6 +98,7 @@ services:
     restart: unless-stopped
     environment:
       - DOMAIN=api.zeefas.com
+    container_name: nginx
 
   certbot:
     image: certbot/certbot
@@ -110,3 +111,4 @@ services:
       /bin/sh -c 'trap exit TERM; while :; do certbot renew; sleep 12h & wait $${!}; done;'
     networks:
       - app_network
+    container_name: certbot

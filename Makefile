@@ -2,6 +2,9 @@
 -include makefiles/fail2ban.mk
 -include makefiles/vps.mk
 
+$(PYTHON) manage.py wait_for_nginx
+
+
 install_whl:
 	pip install requirements/django_nose-1.4.7-py2.py3-none-any.whl
 
@@ -110,7 +113,7 @@ up:
 
 certs: up
 	@echo "Waiting for Nginx to be ready..."
-	python scripts/wait_for_nginx.py
+	$(PYTHON) scripts/wait_for_nginx.py
 	@echo "Generating Let's Encrypt certificates for $(DOMAIN)..."
 	docker compose -f $(COMPOSE_FILE) run --rm $(CERTBOT_CONTAINER) certonly --webroot --webroot-path=/var/www/certbot \
 		--email "$(EMAIL)" --agree-tos --no-eff-email --force-renewal -d $(DOMAIN)
