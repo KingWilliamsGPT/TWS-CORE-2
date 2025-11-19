@@ -164,7 +164,18 @@ rebuild:
 
 rebuild-app:
 	@echo "Rebuilding Django app container..."
-	docker compose -f docker-compose.yaml up -d --build django_app
+	docker compose -f docker-compose.yaml up -d --build ${DJANGO_APP_CONTAINER}
+
+
+collectstatic:
+	docker compose exec ${DJANGO_APP_CONTAINER} python manage.py collectstatic --noinput
+
+manual-collectstatic:
+	docker run --rm \
+		-v $$(pwd)/src/static:/source \
+		-v static_volume:/dest \
+		alpine sh -c "cp -r /source/* /dest/"
+
 
 list-containers:
 	docker ps -a --format "table {{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}"
