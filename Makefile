@@ -125,7 +125,7 @@ certs: up
 		--email "$(DOCKER_EMAIL)" --agree-tos --no-eff-email --force-renewal -d $(DOMAIN)
 	@echo "Certificate generation complete."
 
-restart: certs
+restart:
 	@echo "Regenerating Nginx config with HTTPS..."
 	docker compose -f $(COMPOSE_FILE) exec $(NGINX_CONTAINER) /bin/bash /start-nginx.sh
 	@echo "Restarting Nginx..."
