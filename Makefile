@@ -122,7 +122,7 @@ certs: up
 	python3 scripts/wait_for_nginx.py
 	@echo "Generating Let's Encrypt certificates for $(DOMAIN)..."
 	docker compose -f $(COMPOSE_FILE) run --rm $(CERTBOT_CONTAINER) certonly --webroot --webroot-path=/var/www/certbot \
-		--email "$(EMAIL)" --agree-tos --no-eff-email --force-renewal -d $(DOMAIN)
+		--email "$(DOCKER_EMAIL)" --agree-tos --no-eff-email --force-renewal -d $(DOMAIN)
 	@echo "Certificate generation complete."
 
 restart: certs
@@ -144,7 +144,7 @@ setup-cert:
 		-v ./certbot/conf:/etc/letsencrypt \
 		-v ./certbot/www:/var/www/certbot \
 		certbot/certbot certonly --webroot -w /var/www/certbot \
-		--email $(EMAIL) --agree-tos --no-eff-email -d $(DOMAIN)
+		--email $(DOCKER_EMAIL) --agree-tos --no-eff-email -d $(DOMAIN)
 	@echo "Certificate generation complete."
 
 help:
