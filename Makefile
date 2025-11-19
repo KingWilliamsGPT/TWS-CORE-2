@@ -157,5 +157,32 @@ rebuild-app:
 	@echo "Rebuilding Django app container..."
 	docker compose -f docker-compose.yaml up -d --build django_app
 
+list-containers:
+	docker ps -a --format "table {{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}"
+
+list-volumes:
+	docker volume ls --format "table {{.Name}}\t{{.Driver}}"
+
+list-networks:
+	docker network ls --format "table {{.Name}}\t{{.Driver}}"
+
+list-images:
+	docker images --format "table {{.Repository}}\t{{.Tag}}\t{{.ID}}\t{{.Size}}"
+
+health-check:
+	docker inspect --format='{{.Name}}: {{.State.Health.Status}}' $(docker ps -q)
+
+dockerness:
+	@echo "====== CONTAINERS ======="
+	docker ps -a --format "table {{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}"
+	@echo "====== VOLUMES =========="
+	docker volume ls --format "table {{.Name}}\t{{.Driver}}"
+	@echo "====== NETWORKS ========="
+	docker network ls --format "table {{.Name}}\t{{.Driver}}"
+	@echo "====== IMAGES ==========="
+	docker images --format "table {{.Repository}}\t{{.Tag}}\t{{.ID}}\t{{.Size}}"
+	@echo "====== HEALTH CHECK ====="
+	docker inspect --format='{{.Name}}: {{.State.Health.Status}}' $(docker ps -q)
+
 lazydocker:
 	docker run --rm -it -v /var/run/docker.sock:/var/run/docker.sock -v /your/config:/.config/jesseduffield/lazydocker lazyteam/lazydocker
