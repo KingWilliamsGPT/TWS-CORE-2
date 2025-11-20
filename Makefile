@@ -42,9 +42,6 @@ superuser:
 migrate:
 	python manage.py migrate
 
-collectstatic:
-	python manage.py collectstatic
-
 collectstatic_force:
 	python manage.py collectstatic --noinput --clear
 

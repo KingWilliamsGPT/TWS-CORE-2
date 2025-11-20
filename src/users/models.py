@@ -54,6 +54,11 @@ def password_reset_token_created(
     )
 
 
+class UserType(models.TextChoices):
+    CUSTOMER = "customer", "Customer"
+    SELLER = "seller", "Seller"
+
+
 class UserWalletMixin:
     @property
     def main_wallet(self):
@@ -110,7 +115,101 @@ class UserAuthMixin:
         self.tier = tier
 
 
-class User(UserWalletMixin, UserAuthMixin, AbstractUser):
+class OnboardingStatus(models.TextChoices):
+    NEEDS_BASIC_INFORMATION = "needs_basic_information", "Needs Basic Information"
+    NEEDS_EMAIL_VERIFICATION = "needs_email_verification", "Needs Email Verification"
+    NEEDS_PHONE_VERIFICATION = "needs_phone_verification", "Needs Phone Verification"
+    NEEDS_PROFILE_USERNAME = "needs_profile_username", "Needs Profile Username Completion"
+    NEEDS_PROFILE_PICTURE = "needs_profile_picture", "Needs Profile Picture Upload"
+    NEEDS_LOCATION_INFO = "needs_location_info", "Needs Location Information"
+    NEEDS_STORE_INFO = "needs_store_info", "Needs Store Information"
+    NEEDS_KYC_IDENTITY_VERIFICATION = "needs_kyc_identity_verification", "Needs KYC Identity Verification"
+    NEEDS_BANK = "needs_bank", "Needs Bank Information"
+    NEEDS_VENDOR_PLAN = "needs_vendor_plan", "Needs Vendor Plan Selection"
+    COMPLETED = "completed", "Completed"
+
+
+class OnboardingMixin:
+
+    ONBOARDING_FLOW = {
+        UserType.CUSTOMER: [
+            OnboardingStatus.NEEDS_BASIC_INFORMATION,
+            OnboardingStatus.NEEDS_EMAIL_VERIFICATION,
+            OnboardingStatus.NEEDS_PHONE_VERIFICATION,
+            OnboardingStatus.NEEDS_PROFILE_USERNAME,
+            OnboardingStatus.NEEDS_PROFILE_PICTURE,
+            OnboardingStatus.NEEDS_LOCATION_INFO,
+            OnboardingStatus.COMPLETED,
+        ],
+        UserType.SELLER: [
+            OnboardingStatus.NEEDS_BASIC_INFORMATION,
+            OnboardingStatus.NEEDS_EMAIL_VERIFICATION,
+            OnboardingStatus.NEEDS_PHONE_VERIFICATION,
+            OnboardingStatus.NEEDS_STORE_INFO,
+            OnboardingStatus.NEEDS_KYC_IDENTITY_VERIFICATION,
+            OnboardingStatus.NEEDS_BANK,
+            OnboardingStatus.NEEDS_VENDOR_PLAN,
+            OnboardingStatus.COMPLETED,
+        ]
+    }
+
+    def get_onboarding_flow(self):
+        """Returns the flow for the user type"""
+        if not self.user_type:
+            return []
+        return self.ONBOARDING_FLOW[self.user_type]
+
+    def get_next_onboarding_step(self):
+        """Return the next step based on current onboarding status"""
+        flow = self.get_onboarding_flow()
+        if not flow or self.onboarding_status == self.OnboardingStatus.COMPLETED:
+            return None
+        try:
+            current_index = flow.index(self.onboarding_status)
+        except ValueError:
+            return flow[0]  # fallback to first step
+        if current_index + 1 < len(flow):
+            return flow[current_index + 1]
+        return None
+    
+    def step_after(self, step: OnboardingStatus):
+        """Return the next step based on current onboarding status"""
+        flow = self.get_onboarding_flow()
+        if not flow or self.onboarding_status == self.OnboardingStatus.COMPLETED:
+            return None
+        try:
+            current_index = flow.index(step)
+        except ValueError:
+            return flow[0]  # fallback to first step
+        if current_index + 1 < len(flow):
+            return flow[current_index + 1]
+        return None
+
+    def is_onboarding_completed(self):
+        return self.onboarding_status == self.OnboardingStatus.COMPLETED
+
+    def advance_onboarding(self):
+        """Move to next step in the flow"""
+        next_step = self.get_next_onboarding_step()
+        if next_step:
+            self.onboarding_status = next_step
+            self.save()
+            return next_step
+        return None
+
+    def remaining_onboarding_steps(self):
+        """Return list of steps left"""
+        flow = self.get_onboarding_flow()
+        if not flow:
+            return []
+        try:
+            current_index = flow.index(self.onboarding_status)
+        except ValueError:
+            current_index = 0
+        return flow[current_index + 1:]
+
+
+class User(OnboardingMixin, UserWalletMixin, UserAuthMixin, AbstractUser):
     PASSWORD_MIN_LENGTH = 6
     PASSWORD_MAX_LENGTH = 100
 
@@ -124,20 +223,10 @@ class User(UserWalletMixin, UserAuthMixin, AbstractUser):
         PENDING = 0, "Pending"
         APPROVED = 1, "Approved"
         REJECTED = 2, "Rejected"
-
-    class UserType(models.TextChoices):
-        CUSTOMER = "customer", "Customer"
-        SELLER = "seller", "Seller"
     
-    class RegistrationState(models.TextChoices):
-        START = "start", "Start"
-        EMAIL_VERIFICATION = "email_verification", "Email Verification"
-        PHONE_VERIFICATION = "phone_verification", "Phone Verification"
-        PROFILE_USERNAME = "profile_username", "Profile Username Completion"
-        PROFILE_DETAILS = "profile_details", "Profile Details Completion"
-        KYC = "kyc", "KYC Submission"
-        REVIEW = "review", "KYC Review"
-        COMPLETED = "completed", "Completed"
+
+    UserType = UserType 
+    
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     pub_id = models.UUIDField(
@@ -146,6 +235,11 @@ class User(UserWalletMixin, UserAuthMixin, AbstractUser):
     tier = models.IntegerField(choices=Tier.choices, default=Tier.TIER_0)
     user_type = models.CharField(
         max_length=10, choices=UserType.choices, default=UserType.CUSTOMER
+    )
+    onboarding_status = models.CharField(
+        max_length=50,
+        choices=OnboardingStatus.choices,
+        default=OnboardingStatus.NEEDS_BASIC_INFORMATION,
     )
 
     profile_picture = ThumbnailerImageField(

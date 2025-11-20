@@ -90,7 +90,7 @@ class OtpRateThrottle(UserRateThrottle):
     rate = "3/min"
 
 
-class UserViewSet(viewsets.GenericViewSet):
+class AuthRouterViewSet(viewsets.GenericViewSet):
     """
     Creates, Updates and Retrieves - User Accounts
     """
@@ -162,15 +162,6 @@ class UserViewSet(viewsets.GenericViewSet):
 
         serializer.save()
 
-    @action(detail=False, methods=["get"])
-    def health(self, request):
-        country_data = ""
-        if hasattr(request, "country"):
-            country_data = CountrySerializer(request.country).data
-
-        return Response(
-            {"status": "ok", "country": country_data}, status=status.HTTP_200_OK
-        )
 
     @action(detail=False, methods=["get"])
     def get_countries(self, request):
@@ -180,62 +171,6 @@ class UserViewSet(viewsets.GenericViewSet):
     @action(detail=False, methods=["get"])
     def get_states(self, request):
         return Response({"status": "ok"}, status=status.HTTP_200_OK)
-
-    @action(detail=False, methods=["patch"])
-    def update_me(self, request, *args, **kwargs):
-        be_partial_bro = True
-        instance = self.request.user
-        serializer = self.get_serializer(
-            instance, data=request.data, partial=be_partial_bro
-        )
-        serializer.is_valid(raise_exception=True)
-        username_in = serializer.validated_data.get("username")
-        if username_in and username_in != instance.username:
-            if (
-                User.objects.exclude(id=instance.id)
-                .filter(username=username_in)
-                .exists()
-            ):
-                raise serializers.ValidationError(
-                    {"username": "A user with this username already exists."}
-                )
-        self.perform_update(serializer)
-
-        if getattr(instance, "_prefetched_objects_cache", None):
-            # If 'prefetch_related' has been applied to a queryset, we need to
-            # forcibly invalidate the prefetch cache on the instance.
-            instance._prefetched_objects_cache = {}
-
-        return Response(serializer.data)
-
-    @action(detail=False, methods=["post"])
-    def check_username(self, request, *args, **kwargs):
-        serializer = self.get_serializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        username = serializer.validated_data["username"]
-        return Response(
-            {"is_available": not User.objects.filter(username=username).exists()},
-            status=status.HTTP_200_OK,
-        )
-
-    @action(detail=False, methods=["delete"])
-    def delete_me(self, request, *args, **kwargs):
-        # self.request.user.delete()
-        return Response(status=status.HTTP_204_NO_CONTENT)
-
-    @action(detail=False, methods=["get"])
-    def me(self, request):
-        try:
-            return Response(
-                UserSerializer(
-                    self.request.user, context={"request": self.request}
-                ).data,
-                status=status.HTTP_200_OK,
-            )
-        except Exception as e:
-            return Response(
-                {"error": f"Wrong auth token {e}"}, status=status.HTTP_400_BAD_REQUEST
-            )
 
     @action(detail=False, methods=["post"])
     def join_waitlist(self, request):
@@ -275,7 +210,7 @@ class UserViewSet(viewsets.GenericViewSet):
 
     @action(detail=False, methods=["get"], url_path="qr_image_for_2fa/(?P<token>.*)")
     def qr_image_for_2fa(self, request, token):
-        """Streams QR image of authenticator secret email clients, the token is used to identify the image and it expires"""
+        """This is used by the email client or frontend to display the qr code image for 2fa setup."""
         user_id = verify_signed_token(token, max_age=300)
         if not user_id:
             raise NotFound({"error": "QR code expired or invalid"})
@@ -357,9 +292,9 @@ class UserViewSet(viewsets.GenericViewSet):
         user.set_password(serializer.validated_data["password"])
         user.save()
 
-        otp = UserService.send_user_otp(
-            user, type=OtpType.EMAIL_VERIFICATION, sendit=False
-        )
+        # otp = UserService.send_user_otp(
+        #     user, type=OtpType.EMAIL_VERIFICATION, sendit=False
+        # )
         code_list = UserService.reset_recovery_codes(
             user, sendit=False
         )  # DONOT DONOT AND I REPEAT DONOT SEND THESE CODES IN THIS RESPONSE BRO, the email/phone are not verified hence you cannot tell if they own these resources
@@ -373,8 +308,7 @@ class UserViewSet(viewsets.GenericViewSet):
             to=[user.email],
             html_body=f"""
             Hi {user.username}, here is your OTP to complete your registration 
-            <br><img src='{qr_image_url}' /> 
-            <br> OTP: {otp}
+            <br><img src='{qr_image_url}' />
             <br> And here are your recovery codes: {', '.join(code_list)}
             """,
             sendit=True,
@@ -813,3 +747,93 @@ class UserViewSet(viewsets.GenericViewSet):
             {"msg": "kyc verification pending approval", "code": "pending_approval"},
             status=status.HTTP_200_OK,
         )
+
+
+class UserViewSet(viewsets.GenericViewSet):
+    """
+    Creates, Updates and Retrieves - User Accounts
+    """
+
+    queryset = User.objects.all()
+    serializers = {
+        "default": UserSerializer,
+        "register": CreateUserSerializer,
+        "update_me": UpdateUserSerializer,
+        "check_username": CheckUsernameSerializer,
+        "get_countries": CountrySerializer,
+        "get_states": EmptySerializer,
+    }
+    permissions = {
+        "default": [IsVerifiedUser],
+    }
+
+    def get_serializer_class(self):
+        return self.serializers.get(self.action, self.serializers["default"])
+
+    def get_permissions(self):
+        self.permission_classes = self.permissions.get(
+            self.action, self.permissions["default"]
+        )
+        return super().get_permissions()
+
+    def perform_update(self, serializer):
+        if self.request.user != serializer.instance:
+            raise PermissionDenied("You can only update your own account.")
+
+        serializer.save()
+
+    @action(detail=False, methods=["patch"])
+    def update_me(self, request, *args, **kwargs):
+        be_partial_bro = True
+        instance = self.request.user
+        serializer = self.get_serializer(
+            instance, data=request.data, partial=be_partial_bro
+        )
+        serializer.is_valid(raise_exception=True)
+        username_in = serializer.validated_data.get("username")
+        if username_in and username_in != instance.username:
+            if (
+                User.objects.exclude(id=instance.id)
+                .filter(username=username_in)
+                .exists()
+            ):
+                raise serializers.ValidationError(
+                    {"username": "A user with this username already exists."}
+                )
+        self.perform_update(serializer)
+
+        if getattr(instance, "_prefetched_objects_cache", None):
+            # If 'prefetch_related' has been applied to a queryset, we need to
+            # forcibly invalidate the prefetch cache on the instance.
+            instance._prefetched_objects_cache = {}
+
+        return Response(serializer.data)
+
+    @action(detail=False, methods=["post"])
+    def check_username(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        username = serializer.validated_data["username"]
+        return Response(
+            {"is_available": not User.objects.filter(username=username).exists()},
+            status=status.HTTP_200_OK,
+        )
+
+    @action(detail=False, methods=["delete"])
+    def delete_me(self, request, *args, **kwargs):
+        # self.request.user.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+    @action(detail=False, methods=["get"])
+    def me(self, request):
+        try:
+            return Response(
+                UserSerializer(
+                    self.request.user, context={"request": self.request}
+                ).data,
+                status=status.HTTP_200_OK,
+            )
+        except Exception as e:
+            return Response(
+                {"error": f"Wrong auth token {e}"}, status=status.HTTP_400_BAD_REQUEST
+            )

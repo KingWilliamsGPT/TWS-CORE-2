@@ -31,7 +31,7 @@ from src.users.auth import (
 from src.common.views import HealthCheckView
 from src.social.views import exchange_token, complete_twitter_login
 from src.files.urls import files_router
-from src.users.urls import users_router
+from src.users.urls import users_router, auth_router
 
 # from src.common.urls import common_router
 from src.wallet.urls import wallet_router
@@ -74,6 +74,7 @@ def tag_router(router, tag_name):
 
 sub_routers = [
     [users_router, "user"],
+    [auth_router, "auth"],
     [files_router, "files"],
     # [common_router, "common"],
     [notification_app_router, "notifications"],
