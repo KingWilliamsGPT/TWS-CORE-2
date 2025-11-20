@@ -4,6 +4,8 @@ from rest_framework import viewsets, mixins
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework import status
+from django.views import View
+from django.http import JsonResponse
 
 from .serializers import UploadSerializer, LogDBEntrySerializer, BigLogSerializer
 from .models import LogDBEntry, BigLog
@@ -57,3 +59,8 @@ class BigLogViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
         logs = self.queryset.filter(user=user)
 
         return Response(self.serializer_class(logs, many=True).data)
+
+
+class HealthCheckView(View):
+    def get(self, request):
+        return JsonResponse({"status": "ok"}, status=status.HTTP_200_OK)

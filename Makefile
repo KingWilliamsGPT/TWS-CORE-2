@@ -17,9 +17,13 @@ install: install_whl
 uninstall:
 	pip uninstall -r requirements/dev.txt
 
-runserver:
+runserver-static:
 # 	python manage.py runserver 9000
 	daphne -p 9000 src.asgi:application
+
+runserver:
+	watchfiles --filter python "daphne -p 9000 src.asgi:application"
+
 
 run: runserver
 

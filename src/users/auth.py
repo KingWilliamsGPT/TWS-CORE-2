@@ -4,6 +4,7 @@ import secrets
 from django.conf import settings
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
+from drf_spectacular.utils import extend_schema
 from rest_framework import serializers
 from rest_framework import generics, status
 from rest_framework.response import Response
@@ -23,7 +24,6 @@ from rest_framework_simplejwt.serializers import (
 )
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth.models import update_last_login
-
 
 from src.users.utils import generate_signed_token, verify_signed_token
 from src.social.views import exchange_token, complete_twitter_login
@@ -136,7 +136,7 @@ class SecondFactorSerializer(serializers.Serializer):
 
         return {}
 
-
+@extend_schema(tags=["auth"])
 class TokenPairView__FirstFactor(TokenObtainPairView):
     """Return access and refresh token if 2FA is disabled
 
@@ -183,7 +183,7 @@ class TokenPairView__FirstFactor(TokenObtainPairView):
 
         return Response({"tfa_token": signed_token}, status=status.HTTP_200_OK)
 
-
+@extend_schema(tags=["auth"])
 class TokenPairView__SecondFactor(TokenViewBase):
     serializer_class = SecondFactorSerializer
 
@@ -210,7 +210,7 @@ class TokenPairView__SecondFactor(TokenViewBase):
 
         return _jwt_response(serializer)
 
-
+@extend_schema(tags=["auth"])
 class RefreshTokenView(TokenRefreshView):
     def post(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)

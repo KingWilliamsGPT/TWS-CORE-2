@@ -4,6 +4,7 @@ from django.conf.urls.static import static
 from django.views.generic.base import RedirectView
 from rest_framework.routers import DefaultRouter
 
+
 # from drf_yasg.views import get_schema_view
 # from drf_yasg.utils import swagger_auto_schema
 # from drf_yasg import openapi
@@ -13,14 +14,21 @@ from drf_spectacular.views import (
     SpectacularRedocView,
     SpectacularSwaggerView,
 )
+from django.urls.resolvers import URLPattern, URLResolver
 from django.utils.decorators import method_decorator
-
+import django_rest_passwordreset.urls as drpr_urls
+from django_rest_passwordreset.views import (
+    ResetPasswordValidateToken,
+    ResetPasswordConfirm,
+    ResetPasswordRequestToken,
+)
 
 from src.users.auth import (
     TokenPairView__FirstFactor,
     TokenPairView__SecondFactor,
     RefreshTokenView,
 )
+from src.common.views import HealthCheckView
 from src.social.views import exchange_token, complete_twitter_login
 from src.files.urls import files_router
 from src.users.urls import users_router
@@ -89,6 +97,29 @@ for r in sub_routers:
     router.registry.extend(sub_router.registry)
 
 
+def tag_endpoint(tag_name, view):
+    """
+    USECASE:
+    >>> # class based view
+    >>> path("my-endpoint/", tag_endpoint("mytag", MyView.as_view()))
+    >>> # function based view
+    >>> path("my-endpoint/", tag_endpoint("mytag", my_view_function))
+    """
+    return extend_schema(tags=[tag_name])(view)
+
+@extend_schema(tags=["auth"])
+class MyResetPasswordRequestToken(ResetPasswordRequestToken):
+    pass
+
+@extend_schema(tags=["auth"])
+class MyResetPasswordValidateToken(ResetPasswordValidateToken):
+    pass
+
+@extend_schema(tags=["auth"])
+class MyResetPasswordConfirm(ResetPasswordConfirm):
+    pass
+
+
 urlpatterns = [
     # admin panel
     # path('admin/', admin.site.urls),    # disable the django admin site
@@ -97,31 +128,50 @@ urlpatterns = [
     path("summernote/", include("django_summernote.urls")),
     # api
     path("api/v1/", include(router.urls)),
+    # path(
+    #     "api/v1/auth/password_reset/",
+    #     include("django_rest_passwordreset.urls", namespace="password_reset"),
+    # ),  
     path(
-        "api/v1/password_reset/",
-        include("django_rest_passwordreset.urls", namespace="password_reset"),
-    ),  # Updated
+        "api/v1/auth/password/reset/",
+        MyResetPasswordRequestToken.as_view(),
+        name="password_reset",
+    ),
+    path(
+        "api/v1/auth/password/reset/validate_token/",
+        MyResetPasswordValidateToken.as_view(),
+        name="password_reset_validate_token",
+    ),
+    path(
+        "api/v1/auth/password/reset/confirm/",
+        MyResetPasswordConfirm.as_view(),
+        name="password_reset_confirm",
+    ),
     # auth
     path("api-auth/", include("rest_framework.urls", namespace="rest_framework")),
     path(
-        "api/v1/login/token/1stfactor/",
+        "api/v1/auth/login/1stfactor/",
         TokenPairView__FirstFactor.as_view(),
         name="token_obtain_pair",
     ),
     path(
-        "api/v1/login/token/2ndfactor/",
+        "api/v1/auth/login/2ndfactor/",
         TokenPairView__SecondFactor.as_view(),
         name="token_obtain_pair2",
     ),
     path(
-        "api/v1/login/token/refresh/", RefreshTokenView.as_view(), name="token_refresh"
+        "api/v1/auth/login/refresh/", RefreshTokenView.as_view(), name="token_refresh"
     ),
     # social login
     path("", include("social_django.urls", namespace="social")),  # Updated
-    path("complete/twitter/", complete_twitter_login),  # Updated
+    path(
+        "api/v1/auth/social/complete/twitter/",
+        tag_endpoint("auth", complete_twitter_login),
+    ),
     re_path(
-        r"^api/v1/social/(?P<backend>[^/]+)/$", exchange_token
-    ),  # Kept as re_path for regex
+        r"^api/v1/auth/social/(?P<backend>[^/]+)/$",
+        tag_endpoint("auth", exchange_token),
+    ),
     # OpenAPI schema endpoint
     path("api/schema/", SpectacularAPIView.as_view(), name="schema"),
     # Swagger UI
@@ -131,8 +181,9 @@ urlpatterns = [
         name="swagger-ui",
     ),
     # Redoc UI (optional)
-    path("api/redoc/", SpectacularRedocView.as_view(url_name="schema"), name="redoc"),
-    path("health/", include("health_check.urls")),  # Updated
+    path("api/redocs/", SpectacularRedocView.as_view(url_name="schema"), name="redoc"),
+    path("health/", HealthCheckView.as_view(), name="health-check"), 
+    path("health/stats", include("health_check.urls")),
     # the 'api-root' from django rest-frameworks default router
     re_path(r"^$", RedirectView.as_view(url=reverse_lazy("api-root"), permanent=False)),
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

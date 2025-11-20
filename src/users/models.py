@@ -128,6 +128,16 @@ class User(UserWalletMixin, UserAuthMixin, AbstractUser):
     class UserType(models.TextChoices):
         CUSTOMER = "customer", "Customer"
         SELLER = "seller", "Seller"
+    
+    class RegistrationState(models.TextChoices):
+        START = "start", "Start"
+        EMAIL_VERIFICATION = "email_verification", "Email Verification"
+        PHONE_VERIFICATION = "phone_verification", "Phone Verification"
+        PROFILE_USERNAME = "profile_username", "Profile Username Completion"
+        PROFILE_DETAILS = "profile_details", "Profile Details Completion"
+        KYC = "kyc", "KYC Submission"
+        REVIEW = "review", "KYC Review"
+        COMPLETED = "completed", "Completed"
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     pub_id = models.UUIDField(
