@@ -163,16 +163,16 @@ class AuthRouterViewSet(viewsets.GenericViewSet):
         serializer.save()
 
 
-    @action(detail=False, methods=["get"])
+    @action(detail=False, methods=["get"], url_path="utils/get_countries")
     def get_countries(self, request):
         countries = Country.objects.all().order_by("name")
         return Response(CountrySerializer(countries, many=True).data)
 
-    @action(detail=False, methods=["get"])
+    @action(detail=False, methods=["get"], url_path="utils/get_states")
     def get_states(self, request):
         return Response({"status": "ok"}, status=status.HTTP_200_OK)
 
-    @action(detail=False, methods=["post"])
+    @action(detail=False, methods=["post"], url_path="join_waitlist")
     def join_waitlist(self, request):
         serializer = self.get_serializer_class()(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -220,7 +220,7 @@ class AuthRouterViewSet(viewsets.GenericViewSet):
 
         return self.get_qr_image_for_2fa(user)
 
-    @action(detail=False, methods=["post"])
+    @action(detail=False, methods=["post"], url_path="2fa/request_qr_code")
     def request_qr_code(self, request):
         """This endpoint returns a signed token that expires in 5 minutes.
 
@@ -248,7 +248,7 @@ class AuthRouterViewSet(viewsets.GenericViewSet):
             )
 
         token = generate_signed_token(user.id)
-        image_url = reverse("users-qr-image-for-2fa", kwargs={"token": token})
+        image_url = reverse("auth-qr-image-for-2fa", kwargs={"token": token})
         qrcode_uri = user.get_authenticator_uri()
 
         serializer_data = {
@@ -261,11 +261,30 @@ class AuthRouterViewSet(viewsets.GenericViewSet):
     @action(detail=False, methods=["post"])
     def register(self, request):
         """Register a new user.
-
-        Tier 0: No verification done yet.
-        Tier 1: Email/Phone verification done.
-        Tier 2: Liveness check done.
-        Tier 3: BVN verification done.
+        
+        ```python
+        ONBOARDING_FLOW = {
+            UserType.CUSTOMER: [
+                OnboardingStatus.NEEDS_BASIC_INFORMATION,
+                OnboardingStatus.NEEDS_EMAIL_VERIFICATION,
+                OnboardingStatus.NEEDS_PHONE_VERIFICATION,
+                OnboardingStatus.NEEDS_PROFILE_USERNAME,
+                OnboardingStatus.NEEDS_PROFILE_PICTURE,
+                OnboardingStatus.NEEDS_LOCATION_INFO,
+                OnboardingStatus.COMPLETED,
+            ],
+            UserType.SELLER: [
+                OnboardingStatus.NEEDS_BASIC_INFORMATION,
+                OnboardingStatus.NEEDS_EMAIL_VERIFICATION,
+                OnboardingStatus.NEEDS_PHONE_VERIFICATION,
+                OnboardingStatus.NEEDS_STORE_INFO,
+                OnboardingStatus.NEEDS_KYC_IDENTITY_VERIFICATION,
+                OnboardingStatus.NEEDS_BANK,
+                OnboardingStatus.NEEDS_VENDOR_PLAN,
+                OnboardingStatus.COMPLETED,
+            ]
+        }
+        ```
         """
         serializer = CreateUserSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -288,7 +307,7 @@ class AuthRouterViewSet(viewsets.GenericViewSet):
             is_phone_number_verified=False,
             country_registered_with=request.country.iso,
         )
-
+        user.advance_onboarding()
         user.set_password(serializer.validated_data["password"])
         user.save()
 
@@ -300,7 +319,7 @@ class AuthRouterViewSet(viewsets.GenericViewSet):
         )  # DONOT DONOT AND I REPEAT DONOT SEND THESE CODES IN THIS RESPONSE BRO, the email/phone are not verified hence you cannot tell if they own these resources
         user_token = generate_signed_token(user.id)
         qr_image_url = f"{self.request.scheme}://{self.request.get_host()}" + reverse(
-            "users-qr-image-for-2fa", kwargs={"token": user_token}
+            "auth-qr-image-for-2fa", kwargs={"token": user_token}
         )
 
         UserService.do_send_email(
@@ -316,7 +335,7 @@ class AuthRouterViewSet(viewsets.GenericViewSet):
 
         return Response(CreateUserSerializer(user).data, status=status.HTTP_201_CREATED)
 
-    @action(detail=False, methods=["post"], throttle_classes=[OtpRateThrottle])
+    @action(detail=False, methods=["post"], throttle_classes=[OtpRateThrottle], url_path="email/send_email_verification_otp")
     def send_email_verification_otp(self, request):
         """Send OTP to user to verify email.
 
@@ -342,7 +361,7 @@ class AuthRouterViewSet(viewsets.GenericViewSet):
         UserService.send_user_otp(user, type=OtpType.EMAIL_VERIFICATION)
         return Response({"otp": "otp sent to your email"}, status=status.HTTP_200_OK)
 
-    @action(detail=False, methods=["post"], throttle_classes=[OtpRateThrottle])
+    @action(detail=False, methods=["post"], throttle_classes=[OtpRateThrottle], url_path="phone/send_phone_verification_otp")
     def send_phone_verification_otp(self, request):
         """Send OTP to user to verify phone number.
 
@@ -373,7 +392,7 @@ class AuthRouterViewSet(viewsets.GenericViewSet):
             {"otp": "otp sent to your phone number"}, status=status.HTTP_200_OK
         )
 
-    @action(detail=False, methods=["post"], throttle_classes=[OtpRateThrottle])
+    @action(detail=False, methods=["post"], throttle_classes=[OtpRateThrottle], url_path="2fa/send_2fa_otp")
     def send_2fa_otp(self, request):
         """
         Get OTP for user to verify email or phone number
@@ -409,7 +428,7 @@ class AuthRouterViewSet(viewsets.GenericViewSet):
             status=status.HTTP_200_OK,
         )
 
-    @action(detail=False, methods=["post"], throttle_classes=[OtpRateThrottle])
+    @action(detail=False, methods=["post"], throttle_classes=[OtpRateThrottle], url_path="email/check_email_verification_otp")
     def check_email_verification_otp(self, request):
         """Verify OTP for user to verify email.
 
@@ -442,14 +461,16 @@ class AuthRouterViewSet(viewsets.GenericViewSet):
             return Response(
                 {
                     "otp": "otp verified",
-                    "need_phone_verification": not user.is_phone_number_verified,
+                    # "need_phone_verification": not user.is_phone_number_verified,
+                    "onboarding_status": user.onboarding_status,
+                    "onboarding_flow": user.get_onboarding_flow(),
                 },
                 status=status.HTTP_200_OK,
             )
 
         return Response({"error": "invalid otp"}, status=status.HTTP_400_BAD_REQUEST)
 
-    @action(detail=False, methods=["post"])
+    @action(detail=False, methods=["post"], throttle_classes=[OtpRateThrottle], url_path="phone/check_phone_verification_otp")
     def check_phone_verification_otp(self, request):
         """Verify OTP for user to verify phone number
 
@@ -484,14 +505,16 @@ class AuthRouterViewSet(viewsets.GenericViewSet):
             return Response(
                 {
                     "otp": "otp verified",
-                    "need_email_verification": not user.is_email_verified,
+                    # "need_email_verification": not user.is_email_verified,
+                    "onboarding_status": user.onboarding_status,
+                    "onboarding_flow": user.get_onboarding_flow(),
                 },
                 status=status.HTTP_200_OK,
             )
 
         return Response({"error": "invalid otp"}, status=status.HTTP_400_BAD_REQUEST)
 
-    @action(detail=False, methods=["post"])
+    @action(detail=False, methods=["post"], throttle_classes=[OtpRateThrottle], url_path="2fa/check_2fa_otp")
     def check_2fa_otp(self, request):
         """Verify OTP for user to verify email or phone number
 
@@ -510,7 +533,7 @@ class AuthRouterViewSet(viewsets.GenericViewSet):
             return Response({"otp": "otp verified"}, status=status.HTTP_200_OK)
         return Response({"error": "invalid otp"}, status=status.HTTP_400_BAD_REQUEST)
 
-    @action(detail=False, methods=["put"])
+    @action(detail=False, methods=["put"], url_path="password")
     def password_reset(self, request):
         """Reset password when user is logged in"""
         serializer = self.get_serializer_class()(data=request.data)
@@ -536,7 +559,7 @@ class AuthRouterViewSet(viewsets.GenericViewSet):
 
         raise ValidationError({"error": "invalid old password"})
 
-    @action(detail=False, methods=["put"])
+    @action(detail=False, methods=["put"], throttle_classes=[OtpRateThrottle], url_path="password/send_forgot_password_otp")
     def send_forgot_password_otp(self, request):
         # send otp to email before doing anything
 
@@ -561,7 +584,7 @@ class AuthRouterViewSet(viewsets.GenericViewSet):
 
         return Response({"msg": "password reset email sent"})
 
-    @action(detail=False, methods=["put"])
+    @action(detail=False, methods=["put"], throttle_classes=[OtpRateThrottle], url_path="password/reset_forgot_password")
     def reset_forgot_password(self, request):
         serializer = self.get_serializer_class()(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -630,7 +653,7 @@ class AuthRouterViewSet(viewsets.GenericViewSet):
 
         return True
 
-    @action(detail=False, methods=["post"])
+    @action(detail=False, methods=["post"], url_path="2fa/reset_recovery_codes")
     def reset_recovery_codes(self, request):
         """Reset's users recovery codes
 

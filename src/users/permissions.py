@@ -19,41 +19,36 @@ class IsUserOrReadOnly(permissions.BasePermission):
 class IsVerifiedUser(permissions.BasePermission):
 
     def has_permission(self, request, view):
-        errors = []
-        for _ in range(1):
-            if request.user.is_anonymous:
-                errors.append(
-                    {
-                        "message": "Authentication credentials were not provided.",
-                        "code": "not_authenticated",
-                    }
-                )
-                break
-            if not request.user.is_email_verified:
-                errors.append(
-                    {
-                        "message": "Email not verified.",
-                        "code": "email_not_verified",
-                    }
-                )
-            # if not request.user.is_phone_number_verified:
-            #     errors.append(
-            #         {
-            #             "message": "Phone number not verified.",
-            #             "code": "phone_number_not_verified",
-            #         }
-            #     )
-            if not request.user.is_active:
-                errors.append(
-                    {
-                        "message": "User account is disabled.",
-                        "code": "user_inactive",
-                    }
-                )
-            break
+        if not request.user.is_authenticated:
+            return False
 
-        if errors:
-            raise PermissionDenied({"errors": errors})
+        if not request.user.is_active:
+            raise PermissionDenied(
+                {
+                    "message": "You need to complete the onboarding process to perform this action.",
+                    "details": {
+                        "onboarding_status": request.user.onboarding_status,
+                        "onboarding_flow": request.user.get_onboarding_flow(),
+                    },
+                    "code": "onboarding_incomplete",
+                }
+            )
+        
+        if not request.user.is_onboarding_complete():
+            raise PermissionDenied(
+                {
+                    "errors": [
+                        {
+                            "message": "You need to complete the onboarding process to perform this action.",
+                            "details": {
+                                "onboarding_status": request.user.onboarding_status,
+                                "onboarding_flow": request.user.get_onboarding_flow(),
+                            },
+                            "code": "onboarding_incomplete",
+                        }
+                    ]
+                }
+            )
 
         return True
 

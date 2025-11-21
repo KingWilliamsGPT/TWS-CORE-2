@@ -214,12 +214,14 @@ class UserService:
                     user.email_otp_hash = None
                     user.email_otp_expires_at = None
                     cls.update_tier(user, saveit=False)
+                    user.advance_onboarding(from_step=user.OnboardingStatus.NEEDS_EMAIL_VERIFICATION)
                     user.save(
                         update_fields=[
                             "is_email_verified",
                             "email_otp_hash",
                             "email_otp_expires_at",
                             "tier",
+                            "onboarding_status",
                         ]
                     )
                     return True
@@ -229,7 +231,7 @@ class UserService:
                 return False
 
             elif type == OtpType.PHONE_VERIFICATION:
-                if not user.email_otp_hash:
+                if not user.phone_otp_hash:
                     raise ValidationError({"error": "User phone number not verified"})
                 if user.is_phone_number_verified:
                     raise ValidationError(
@@ -248,12 +250,14 @@ class UserService:
                     user.phone_otp = None
                     user.phone_otp_expires_at = None
                     cls.update_tier(user, saveit=False)
+                    user.advance_onboarding(from_step=user.OnboardingStatus.NEEDS_PHONE_VERIFICATION)
                     user.save(
                         update_fields=[
                             "is_phone_number_verified",
                             "phone_otp_hash",
                             "phone_otp_expires_at",
                             "tier",
+                            "onboarding_status",
                         ]
                     )
                     return True

@@ -59,6 +59,21 @@ class UserType(models.TextChoices):
     SELLER = "seller", "Seller"
 
 
+class OnboardingStatus(models.TextChoices):
+    NEEDS_BASIC_INFORMATION = "needs_basic_information", "Needs Basic Information"
+    NEEDS_EMAIL_VERIFICATION = "needs_email_verification", "Needs Email Verification"
+    NEEDS_PHONE_VERIFICATION = "needs_phone_verification", "Needs Phone Verification"
+    NEEDS_USER_TYPE = "needs_user_type", "Needs User Type Selection"
+    NEEDS_PROFILE_USERNAME = "needs_profile_username", "Needs Profile Username Completion"
+    NEEDS_PROFILE_PICTURE = "needs_profile_picture", "Needs Profile Picture Upload"
+    NEEDS_LOCATION_INFO = "needs_location_info", "Needs Location Information"
+    NEEDS_STORE_INFO = "needs_store_info", "Needs Store Information"
+    NEEDS_KYC_IDENTITY_VERIFICATION = "needs_kyc_identity_verification", "Needs KYC Identity Verification"
+    NEEDS_BANK = "needs_bank", "Needs Bank Information"
+    NEEDS_VENDOR_PLAN = "needs_vendor_plan", "Needs Vendor Plan Selection"
+    COMPLETED = "completed", "Completed"
+
+
 class UserWalletMixin:
     @property
     def main_wallet(self):
@@ -115,27 +130,15 @@ class UserAuthMixin:
         self.tier = tier
 
 
-class OnboardingStatus(models.TextChoices):
-    NEEDS_BASIC_INFORMATION = "needs_basic_information", "Needs Basic Information"
-    NEEDS_EMAIL_VERIFICATION = "needs_email_verification", "Needs Email Verification"
-    NEEDS_PHONE_VERIFICATION = "needs_phone_verification", "Needs Phone Verification"
-    NEEDS_PROFILE_USERNAME = "needs_profile_username", "Needs Profile Username Completion"
-    NEEDS_PROFILE_PICTURE = "needs_profile_picture", "Needs Profile Picture Upload"
-    NEEDS_LOCATION_INFO = "needs_location_info", "Needs Location Information"
-    NEEDS_STORE_INFO = "needs_store_info", "Needs Store Information"
-    NEEDS_KYC_IDENTITY_VERIFICATION = "needs_kyc_identity_verification", "Needs KYC Identity Verification"
-    NEEDS_BANK = "needs_bank", "Needs Bank Information"
-    NEEDS_VENDOR_PLAN = "needs_vendor_plan", "Needs Vendor Plan Selection"
-    COMPLETED = "completed", "Completed"
-
-
 class OnboardingMixin:
+
 
     ONBOARDING_FLOW = {
         UserType.CUSTOMER: [
             OnboardingStatus.NEEDS_BASIC_INFORMATION,
             OnboardingStatus.NEEDS_EMAIL_VERIFICATION,
             OnboardingStatus.NEEDS_PHONE_VERIFICATION,
+            OnboardingStatus.NEEDS_USER_TYPE,
             OnboardingStatus.NEEDS_PROFILE_USERNAME,
             OnboardingStatus.NEEDS_PROFILE_PICTURE,
             OnboardingStatus.NEEDS_LOCATION_INFO,
@@ -145,6 +148,7 @@ class OnboardingMixin:
             OnboardingStatus.NEEDS_BASIC_INFORMATION,
             OnboardingStatus.NEEDS_EMAIL_VERIFICATION,
             OnboardingStatus.NEEDS_PHONE_VERIFICATION,
+            OnboardingStatus.NEEDS_USER_TYPE,
             OnboardingStatus.NEEDS_STORE_INFO,
             OnboardingStatus.NEEDS_KYC_IDENTITY_VERIFICATION,
             OnboardingStatus.NEEDS_BANK,
@@ -188,9 +192,20 @@ class OnboardingMixin:
     def is_onboarding_completed(self):
         return self.onboarding_status == self.OnboardingStatus.COMPLETED
 
-    def advance_onboarding(self):
+    def advance_onboarding(self, from_step=None):
         """Move to next step in the flow"""
         next_step = self.get_next_onboarding_step()
+        if from_step:
+            flow = self.get_onboarding_flow()
+            from_step_index = flow.index(from_step)
+            current_index = flow.index(self.onboarding_status)
+            if from_step_index < current_index:
+                # this means we have already advanced beyond this step, advancing from `from_step` might take us backwards
+                next_step = self.onboarding_status
+            elif from_step_index > current_index:
+                # This is unlikely but it does mean that current_step has not been fully completed
+                next_step = current_index
+
         if next_step:
             self.onboarding_status = next_step
             self.save()
@@ -226,6 +241,7 @@ class User(OnboardingMixin, UserWalletMixin, UserAuthMixin, AbstractUser):
     
 
     UserType = UserType 
+    OnboardingStatus = OnboardingStatus
     
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -314,6 +330,11 @@ class User(OnboardingMixin, UserWalletMixin, UserAuthMixin, AbstractUser):
     # MeToMany
     # - wallets: Wallet
     # - recovery_codes: RecoveryCode
+
+    def save(self, *args, **kwargs):
+        if self.email:
+            self.email = self.email.lower()
+        super().save(*args, **kwargs)
 
     def set_bvn(self, raw_bvn, save=True):
         """

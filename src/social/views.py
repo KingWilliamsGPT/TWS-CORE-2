@@ -280,7 +280,8 @@ def exchange_token(request, backend):
             # and is not a placeholder email
             if not user.is_email_verified and not _is_placeholder_email(user.email):
                 user.is_email_verified = True
-                user.save(update_fields=["is_email_verified"])
+                user.advance_onboarding(from_step=user.OnboardingStatus.NEEDS_EMAIL_VERIFICATION)
+                user.save(update_fields=["is_email_verified", "onboarding_status"])
                 logger.info(f"Marked email as verified for user {user.id}")
 
     except Exception as e:

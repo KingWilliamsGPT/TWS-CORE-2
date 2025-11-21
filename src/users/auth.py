@@ -164,14 +164,25 @@ class TokenPairView__FirstFactor(TokenObtainPairView):
         user = serializer.user
 
         # if not (user.is_email_verified or user.is_phone_number_verified):
-        if not (user.is_email_verified):
+        # if not (user.is_email_verified):
+        #     raise PermissionDenied(
+        #         {
+        #             "error": "user email or phone number not verified",
+        #             "details": {
+        #                 "email_verified": user.is_email_verified,
+        #                 "phone_number_verified": user.is_phone_number_verified,
+        #             },
+        #         }
+        #     )
+        if not user.is_onboarding_completed():
             raise PermissionDenied(
                 {
-                    "error": "user email or phone number not verified",
+                    "message": "You need to complete the onboarding process to perform this action.",
                     "details": {
-                        "email_verified": user.is_email_verified,
-                        "phone_number_verified": user.is_phone_number_verified,
+                        "onboarding_status": user.onboarding_status,
+                        "onboarding_flow": user.get_onboarding_flow(),
                     },
+                    "code": "onboarding_incomplete",
                 }
             )
 

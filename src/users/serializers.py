@@ -98,6 +98,7 @@ class UserSerializer(serializers.ModelSerializer):
         write_only=True,
         required=False,
     )
+    onboarding_flow = serializers.SerializerMethodField()
 
     class Meta:
         model = User
@@ -114,7 +115,9 @@ class UserSerializer(serializers.ModelSerializer):
             "tier",
             "country",
             "country_id",
-            "state",
+            # "state",
+            "onboarding_status",
+            "onboarding_flow",
             "country_registered_with",
             "is_email_verified",
             "is_phone_number_verified",
@@ -132,6 +135,8 @@ class UserSerializer(serializers.ModelSerializer):
         )
         read_only_fields = [*fields]
 
+    def get_onboarding_flow(self, obj):
+        return obj.get_onboarding_flow()
 
 class UpdateUserSerializer(serializers.ModelSerializer):
     country = CountrySerializer(read_only=True)
@@ -196,6 +201,9 @@ class CreateUserSerializer(serializers.ModelSerializer):
         write_only=True,
         required=False,
     )
+    onboarding_flow = serializers.SerializerMethodField()
+    def get_onboarding_flow(self, obj):
+        return obj.get_onboarding_flow()
 
     def create(self, validated_data):
         # call create_user on user object. Without this
@@ -219,8 +227,9 @@ class CreateUserSerializer(serializers.ModelSerializer):
             "country",
             "country_id",
             "country_registered_with",
-            "state",
-            "tier",
+            # "state",
+            "onboarding_status",
+            "onboarding_flow",
             "is_email_verified",
             "is_phone_number_verified",
             "is_liveness_check_verified",
@@ -229,7 +238,8 @@ class CreateUserSerializer(serializers.ModelSerializer):
         read_only_fields = (
             # 'tokens',
             "username",
-            "tier",
+            "onboarding_status",
+            "onboarding_flow",
             "is_email_verified",
             "is_phone_number_verified",
             "is_liveness_check_verified",
@@ -254,7 +264,9 @@ class ResetPasswordAndSendEmailSerializer(serializers.Serializer):
 class EmailVerificationSerializer(serializers.Serializer):
     email = serializers.EmailField()
     otp = serializers.CharField(max_length=10, write_only=True, required=False)
-
+    
+    def validate_email(self, value):
+        return value.strip().lower()
 
 class PhoneVerificationSerializer(serializers.Serializer):
     phone_number = PhoneNumberField(region="NG")

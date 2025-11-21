@@ -166,11 +166,11 @@ urlpatterns = [
     # social login
     path("", include("social_django.urls", namespace="social")),  # Updated
     path(
-        "api/v1/auth/social/complete/twitter/",
+        "api/v1/auth/login/social/complete/twitter/",
         tag_endpoint("auth", complete_twitter_login),
     ),
     re_path(
-        r"^api/v1/auth/social/(?P<backend>[^/]+)/$",
+        r"^api/v1/auth/login/social/(?P<backend>[^/]+)/$",
         tag_endpoint("auth", exchange_token),
     ),
     # OpenAPI schema endpoint
