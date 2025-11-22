@@ -129,6 +129,8 @@ class AuthRouterViewSet(viewsets.GenericViewSet):
         "get_onboarding_token": GetOboardingTokenSerializer,
         "set_username": Onboarding.ChangeUserNameSerializer,
         "set_profile_picture": Onboarding.ChangeProfilePictureSerializer,
+        "set_user_type": Onboarding.ChangeUserTypeSerializer,
+        "set_user_location_info": Onboarding.SetUserLocationSerializer,
     }
     permissions = {
         "default": [IsVerifiedUser],
@@ -150,8 +152,9 @@ class AuthRouterViewSet(viewsets.GenericViewSet):
         "get_onboarding_token": (AllowAny,),
         "set_username": (AllowAny,),
         "set_profile_picture": (AllowAny,),
+        "set_user_type": (AllowAny,),
+        "set_user_location_info": (AllowAny,),
     }
-   
 
     def get_serializer_class(self):
         return self.serializers.get(self.action, self.serializers["default"])
@@ -175,7 +178,6 @@ class AuthRouterViewSet(viewsets.GenericViewSet):
             raise PermissionDenied("You can only update your own account.")
 
         serializer.save()
-
 
     @action(detail=False, methods=["get"], url_path="utils/get_countries")
     def get_countries(self, request):
@@ -275,7 +277,7 @@ class AuthRouterViewSet(viewsets.GenericViewSet):
     @action(detail=False, methods=["post"])
     def register(self, request):
         """Register a new user.
-        
+
         ```python
         ONBOARDING_FLOW = {
             UserType.CUSTOMER: [
@@ -348,11 +350,11 @@ class AuthRouterViewSet(viewsets.GenericViewSet):
         )
 
         return Response(CreateUserSerializer(user).data, status=status.HTTP_201_CREATED)
-    
+
     @action(detail=False, methods=["post"], url_path="onboarding/get_onboarding_token")
     def get_onboarding_token(self, request):
         """Get onboarding token for user to continue onboarding process.
-        
+
         This only works as long as the user onboarding is not complete.
 
         **TOKEN EXPIRES IN 2 DAYS**
@@ -374,13 +376,49 @@ class AuthRouterViewSet(viewsets.GenericViewSet):
                 "onboarding_token": onboarding_token,
                 "onboarding_status": user.onboarding_status,
                 "onboarding_flow": user.get_onboarding_flow(),
-            }, status=status.HTTP_200_OK
+            },
+            status=status.HTTP_200_OK,
         )
-    
+
+    @action(detail=False, methods=["post"], url_path="onboarding/set_user_type")
+    def set_user_type(self, request):
+        """Set user type during the onboarding nnprocess.
+
+        This will be disabled when the onboarding process is complete.
+
+        **TOKEN EXPIRES IN 2 DAYS**
+        """
+        serializer = self.get_serializer_class()(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        onboarding_token = serializer.validated_data["onboarding_token"]
+        user_type = serializer.validated_data["user_type"]
+        user_id = User.verify_tfa_token(
+            onboarding_token, max_age=settings.ONBOARDING_TOKEN_EXPIRY_TIME_SECONDS
+        )
+        if not user_id:
+            raise ValidationError({"error": "invalid or expired onboarding token"})
+        user = User.objects.filter(id=user_id).first()
+        if user is None:
+            raise NotFound({"error": "user not found"})
+
+        if user.is_onboarding_completed():
+            raise ValidationError({"error": "user onboarding is already completed"})
+
+        if user.is_future_step(step=User.OnboardingStatus.NEEDS_USER_TYPE):
+            raise ValidationError(
+                {"error": "user is not at the user type onboarding step"}
+            )
+
+        user.user_type = user_type
+        user.advance_onboarding(User.OnboardingStatus.NEEDS_USER_TYPE)
+        user.save(update_fields=["user_type", "onboarding_status"])
+
+        return Response(CreateUserSerializer(user).data, status=status.HTTP_200_OK)
+
     @action(detail=False, methods=["post"], url_path="onboarding/set_username")
     def set_username(self, request):
         """Change username during onboarding process.
-        
+
         This only works as long as the user onboarding is at the username step.
         **TOKEN EXPIRES IN 2 DAYS**
         """
@@ -388,35 +426,44 @@ class AuthRouterViewSet(viewsets.GenericViewSet):
         serializer.is_valid(raise_exception=True)
         onboarding_token = serializer.validated_data["onboarding_token"]
         new_username = serializer.validated_data["new_username"]
-        user_id = User.verify_tfa_token(onboarding_token, max_age=settings.ONBOARDING_TOKEN_EXPIRY_TIME_SECONDS)
+        user_id = User.verify_tfa_token(
+            onboarding_token, max_age=settings.ONBOARDING_TOKEN_EXPIRY_TIME_SECONDS
+        )
         if not user_id:
             raise ValidationError({"error": "invalid or expired onboarding token"})
         user = User.objects.filter(id=user_id).first()
         if user is None:
             raise NotFound({"error": "user not found"})
-        
+
         if user.is_onboarding_completed():
             raise ValidationError({"error": "user onboarding is already completed"})
 
         if user.is_future_step(step=User.OnboardingStatus.NEEDS_PROFILE_USERNAME):
-            raise ValidationError({"error": "user is not at the username onboarding step"})
-        
+            raise ValidationError(
+                {"error": "user is not at the username onboarding step"}
+            )
+
         user.username = new_username
         user.advance_onboarding(User.OnboardingStatus.NEEDS_PROFILE_USERNAME)
         user.save(update_fields=["username", "onboarding_status"])
         return Response(
-            CreateUserSerializer(user, context={'request': request}).data, 
-            status=status.HTTP_200_OK
+            CreateUserSerializer(user, context={"request": request}).data,
+            status=status.HTTP_200_OK,
         )
-    
+
     @extend_schema(
         request=Onboarding.ChangeProfilePictureSerializer,
-        responses={200: CreateUserSerializer}
+        responses={200: CreateUserSerializer},
     )
-    @action(detail=False, methods=["post"], url_path="onboarding/set_profile_picture",  parser_classes=[MultiPartParser, FormParser, FileUploadParser])
+    @action(
+        detail=False,
+        methods=["post"],
+        url_path="onboarding/set_profile_picture",
+        parser_classes=[MultiPartParser, FormParser, FileUploadParser],
+    )
     def set_profile_picture(self, request):
         """Upload profile picture during onboarding process.
-        
+
         This only works as long as the user onboarding is at the profile picture step.
         **TOKEN EXPIRES IN 2 DAYS**
         """
@@ -424,31 +471,80 @@ class AuthRouterViewSet(viewsets.GenericViewSet):
         serializer.is_valid(raise_exception=True)
         onboarding_token = serializer.validated_data["onboarding_token"]
         profile_picture = serializer.validated_data["profile_picture"]
-        
-        user_id = User.verify_tfa_token(onboarding_token, max_age=settings.ONBOARDING_TOKEN_EXPIRY_TIME_SECONDS)
+
+        user_id = User.verify_tfa_token(
+            onboarding_token, max_age=settings.ONBOARDING_TOKEN_EXPIRY_TIME_SECONDS
+        )
         if not user_id:
             raise ValidationError({"error": "invalid or expired onboarding token"})
-        
+
         user = User.objects.filter(id=user_id).first()
         if user is None:
             raise NotFound({"error": "user not found"})
-        
+
         if user.is_onboarding_completed():
             raise ValidationError({"error": "user onboarding is already completed"})
-        
+
         if user.is_future_step(step=User.OnboardingStatus.NEEDS_PROFILE_PICTURE):
-            raise ValidationError({"error": "user is not at the profile picture onboarding step"})
-        
+            raise ValidationError(
+                {"error": "user is not at the profile picture onboarding step"}
+            )
+
         user.profile_picture = profile_picture
         user.advance_onboarding(User.OnboardingStatus.NEEDS_PROFILE_PICTURE)
         user.save(update_fields=["profile_picture", "onboarding_status"])
         return Response(
-            CreateUserSerializer(user, context={'request': request}).data, 
-            status=status.HTTP_200_OK
+            CreateUserSerializer(user, context={"request": request}).data,
+            status=status.HTTP_200_OK,
         )
-        
+    
+    
+    @action(detail=False, methods=["post"], url_path="onboarding/set_user_location_info")
+    def set_user_location_info(self, request):
+        """Set user location info during onboarding process.
 
-    @action(detail=False, methods=["post"], throttle_classes=[OtpRateThrottle], url_path="email/send_email_verification_otp")
+        This only works as long as the user onboarding is at the location info step.
+        **TOKEN EXPIRES IN 2 DAYS**
+        """
+        serializer = self.get_serializer_class()(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        onboarding_token = serializer.validated_data["onboarding_token"]
+        country = serializer.validated_data["country"]
+        state = serializer.validated_data["state"]
+
+        user_id = User.verify_tfa_token(
+            onboarding_token, max_age=settings.ONBOARDING_TOKEN_EXPIRY_TIME_SECONDS
+        )
+        if not user_id:
+            raise ValidationError({"error": "invalid or expired onboarding token"})
+
+        user = User.objects.filter(id=user_id).first()
+        if user is None:
+            raise NotFound({"error": "user not found"})
+
+        if user.is_onboarding_completed():
+            raise ValidationError({"error": "user onboarding is already completed"})
+
+        if user.is_future_step(step=User.OnboardingStatus.NEEDS_LOCATION_INFO):
+            raise ValidationError(
+                {"error": "user is not at the location info onboarding step"}
+            )
+
+        user.country = country
+        user.state = state
+        user.advance_onboarding(User.OnboardingStatus.NEEDS_LOCATION_INFO)
+        user.save(update_fields=["country", "state", "onboarding_status"])
+        return Response(
+            CreateUserSerializer(user, context={"request": request}).data,
+            status=status.HTTP_200_OK,
+        )
+
+    @action(
+        detail=False,
+        methods=["post"],
+        throttle_classes=[OtpRateThrottle],
+        url_path="email/send_email_verification_otp",
+    )
     def send_email_verification_otp(self, request):
         """Send OTP to user to verify email.
 
@@ -474,7 +570,12 @@ class AuthRouterViewSet(viewsets.GenericViewSet):
         UserService.send_user_otp(user, type=OtpType.EMAIL_VERIFICATION)
         return Response({"otp": "otp sent to your email"}, status=status.HTTP_200_OK)
 
-    @action(detail=False, methods=["post"], throttle_classes=[OtpRateThrottle], url_path="phone/send_phone_verification_otp")
+    @action(
+        detail=False,
+        methods=["post"],
+        throttle_classes=[OtpRateThrottle],
+        url_path="phone/send_phone_verification_otp",
+    )
     def send_phone_verification_otp(self, request):
         """Send OTP to user to verify phone number.
 
@@ -505,7 +606,12 @@ class AuthRouterViewSet(viewsets.GenericViewSet):
             {"otp": "otp sent to your phone number"}, status=status.HTTP_200_OK
         )
 
-    @action(detail=False, methods=["post"], throttle_classes=[OtpRateThrottle], url_path="2fa/send_2fa_otp")
+    @action(
+        detail=False,
+        methods=["post"],
+        throttle_classes=[OtpRateThrottle],
+        url_path="2fa/send_2fa_otp",
+    )
     def send_2fa_otp(self, request):
         """
         Get OTP for user to verify email or phone number
@@ -540,7 +646,12 @@ class AuthRouterViewSet(viewsets.GenericViewSet):
             status=status.HTTP_200_OK,
         )
 
-    @action(detail=False, methods=["post"], throttle_classes=[OtpRateThrottle], url_path="email/check_email_verification_otp")
+    @action(
+        detail=False,
+        methods=["post"],
+        throttle_classes=[OtpRateThrottle],
+        url_path="email/check_email_verification_otp",
+    )
     def check_email_verification_otp(self, request):
         """Verify OTP for user to verify email.
 
@@ -582,7 +693,12 @@ class AuthRouterViewSet(viewsets.GenericViewSet):
 
         return Response({"error": "invalid otp"}, status=status.HTTP_400_BAD_REQUEST)
 
-    @action(detail=False, methods=["post"], throttle_classes=[OtpRateThrottle], url_path="phone/check_phone_verification_otp")
+    @action(
+        detail=False,
+        methods=["post"],
+        throttle_classes=[OtpRateThrottle],
+        url_path="phone/check_phone_verification_otp",
+    )
     def check_phone_verification_otp(self, request):
         """Verify OTP for user to verify phone number
 
@@ -626,7 +742,12 @@ class AuthRouterViewSet(viewsets.GenericViewSet):
 
         return Response({"error": "invalid otp"}, status=status.HTTP_400_BAD_REQUEST)
 
-    @action(detail=False, methods=["post"], throttle_classes=[OtpRateThrottle], url_path="2fa/check_2fa_otp")
+    @action(
+        detail=False,
+        methods=["post"],
+        throttle_classes=[OtpRateThrottle],
+        url_path="2fa/check_2fa_otp",
+    )
     def check_2fa_otp(self, request):
         """Verify OTP for user to verify email or phone number
 
@@ -671,7 +792,12 @@ class AuthRouterViewSet(viewsets.GenericViewSet):
 
         raise ValidationError({"error": "invalid old password"})
 
-    @action(detail=False, methods=["put"], throttle_classes=[OtpRateThrottle], url_path="password/send_forgot_password_otp")
+    @action(
+        detail=False,
+        methods=["put"],
+        throttle_classes=[OtpRateThrottle],
+        url_path="password/send_forgot_password_otp",
+    )
     def send_forgot_password_otp(self, request):
         # send otp to email before doing anything
 
@@ -696,7 +822,12 @@ class AuthRouterViewSet(viewsets.GenericViewSet):
 
         return Response({"msg": "password reset email sent"})
 
-    @action(detail=False, methods=["put"], throttle_classes=[OtpRateThrottle], url_path="password/reset_forgot_password")
+    @action(
+        detail=False,
+        methods=["put"],
+        throttle_classes=[OtpRateThrottle],
+        url_path="password/reset_forgot_password",
+    )
     def reset_forgot_password(self, request):
         serializer = self.get_serializer_class()(data=request.data)
         serializer.is_valid(raise_exception=True)

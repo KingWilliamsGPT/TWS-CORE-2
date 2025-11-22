@@ -118,7 +118,7 @@ class UserSerializer(serializers.ModelSerializer):
             "tier",
             "country",
             "country_id",
-            # "state",
+            "state",
             "onboarding_status",
             "onboarding_flow",
             "country_registered_with",
@@ -140,6 +140,7 @@ class UserSerializer(serializers.ModelSerializer):
 
     def get_onboarding_flow(self, obj):
         return obj.get_onboarding_flow()
+
 
 class UpdateUserSerializer(serializers.ModelSerializer):
     country = CountrySerializer(read_only=True)
@@ -205,10 +206,12 @@ class CreateUserSerializer(serializers.ModelSerializer):
         required=False,
     )
     onboarding_flow = serializers.SerializerMethodField()
+
     def get_onboarding_flow(self, obj):
         return obj.get_onboarding_flow()
-    
+
     onboarding_token = serializers.SerializerMethodField()
+
     def get_onboarding_token(self, user):
         return user.get_onboarding_token()
 
@@ -234,7 +237,7 @@ class CreateUserSerializer(serializers.ModelSerializer):
             "country",
             "country_id",
             "country_registered_with",
-            # "state",
+            "state",
             "onboarding_status",
             "onboarding_flow",
             "is_email_verified",
@@ -273,9 +276,10 @@ class ResetPasswordAndSendEmailSerializer(serializers.Serializer):
 class EmailVerificationSerializer(serializers.Serializer):
     email = serializers.EmailField()
     otp = serializers.CharField(max_length=10, write_only=True, required=False)
-    
+
     def validate_email(self, value):
         return value.strip().lower()
+
 
 class PhoneVerificationSerializer(serializers.Serializer):
     phone_number = PhoneNumberField(region="NG")
@@ -319,16 +323,40 @@ class GetOboardingTokenSerializer(serializers.Serializer):
     onboarding_token = serializers.CharField(max_length=500, read_only=True)
 
 
-
 class Onboarding:
     class UseOnboardingTokenSerializer(serializers.Serializer):
         onboarding_token = serializers.CharField(max_length=500, write_only=True)
+
     class ChangeUserNameSerializer(UseOnboardingTokenSerializer):
         new_username = serializers.CharField(max_length=150, write_only=True)
-    
+
     class ChangeProfilePictureSerializer(UseOnboardingTokenSerializer):
         @extend_schema_field(OpenApiTypes.BINARY)
         class ProfilePictureField(serializers.ImageField):
             pass
-        
+
         profile_picture = ProfilePictureField(required=True)
+
+    class ChangeUserTypeSerializer(UseOnboardingTokenSerializer):
+        user_type = serializers.ChoiceField(
+            choices=User.UserType.choices, write_only=True
+        )
+
+    class SetUserLocationSerializer(serializers.ModelSerializer):
+        country = CountrySerializer(read_only=True)
+        country_id = serializers.SlugRelatedField(
+            slug_field="iso",
+            queryset=Country.objects.all(),
+            source="country",
+            write_only=True,
+            required=False,
+        )
+
+        class Meta:
+            model = User
+            fields = (
+                "id",
+                "country",
+                "country_id",
+                "state",
+            )
