@@ -9,6 +9,7 @@ from django.conf import settings
 from django.dispatch import receiver
 from django.contrib.auth.models import AbstractUser
 from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework.exceptions import ValidationError
 from easy_thumbnails.fields import ThumbnailerImageField
 from django.urls import reverse
 from django_rest_passwordreset.signals import reset_password_token_created
@@ -23,6 +24,7 @@ from countries_plus.models import Country
 
 from src.common.helpers import build_absolute_uri
 from src.notifications.services import notify, ACTIVITY_USER_RESETS_PASS
+from src.users.utils import generate_signed_token, verify_signed_token
 from src.wallet.models import Wallet
 
 
@@ -192,9 +194,13 @@ class OnboardingMixin:
     def is_onboarding_completed(self):
         return self.onboarding_status == self.OnboardingStatus.COMPLETED
 
-    def advance_onboarding(self, from_step=None):
+    def advance_onboarding(self, from_step=None, strict=False):
         """Move to next step in the flow"""
         next_step = self.get_next_onboarding_step()
+
+        if strict and not from_step == self.onboarding_status:
+            raise ValidationError("This onboarding step is either in the past or future")
+
         if from_step:
             flow = self.get_onboarding_flow()
             from_step_index = flow.index(from_step)
@@ -204,7 +210,7 @@ class OnboardingMixin:
                 next_step = self.onboarding_status
             elif from_step_index > current_index:
                 # This is unlikely but it does mean that current_step has not been fully completed
-                next_step = current_index
+                next_step = self.onboarding_status
 
         if next_step:
             self.onboarding_status = next_step
@@ -222,6 +228,30 @@ class OnboardingMixin:
         except ValueError:
             current_index = 0
         return flow[current_index + 1:]
+    
+    def is_past_step(self, step: OnboardingStatus):
+        """Check if user has passed a given step"""
+        flow = self.get_onboarding_flow()
+        if not flow:
+            return False
+        try:
+            step_index = flow.index(step)
+            current_index = flow.index(self.onboarding_status)
+        except ValueError:
+            return False
+        return current_index > step_index
+    
+    def is_future_step(self, step: OnboardingStatus):
+        """Check if user has not yet reached a given step"""
+        flow = self.get_onboarding_flow()
+        if not flow:
+            return False
+        try:
+            step_index = flow.index(step)
+            current_index = flow.index(self.onboarding_status)
+        except ValueError:
+            return False
+        return current_index < step_index
 
 
 class User(OnboardingMixin, UserWalletMixin, UserAuthMixin, AbstractUser):
@@ -359,6 +389,26 @@ class User(OnboardingMixin, UserWalletMixin, UserAuthMixin, AbstractUser):
             "refresh": str(refresh),
             "access": str(refresh.access_token),
         }
+    
+    def get_tfa_token(self):
+        import secrets
+        nonce = f"///{secrets.token_hex(10)}"
+        signed_token = generate_signed_token(str(self.id) + nonce)
+        return {"tfa_token": signed_token}
+    
+    def get_onboarding_token(self, *a, **kw): 
+        return self.get_tfa_token(*a, **kw)["tfa_token"]
+
+    @staticmethod
+    def verify_tfa_token(tfa_token, max_age=None):
+        five_minutes = 300  # seconds   
+        max_age = max_age or five_minutes
+        user_id = verify_signed_token(tfa_token, max_age=max_age)
+        if not user_id or "///" not in user_id:
+            return False
+        user_id = user_id.split("///")[0]
+        return user_id
+
 
     def __str__(self):
         return self.email

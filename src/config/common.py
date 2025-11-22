@@ -49,6 +49,8 @@ FRONTEND_DOMAIN = os.getenv("FRONTEND_DOMAIN", "https://zeefas.com")
 DISABLE_DVA_CHECKS = os.getenv("DISABLE_DVA_CHECKS", "False").lower() == "true"
 WHATSAPP_INVITE_LINK = "https://chat.whatsapp.com/JQU7KiHMKPs3Km6yuDhtWR"
 
+ONBOARDING_TOKEN_EXPIRY_TIME_SECONDS = 60 * 60 * 24 * 2 # 2 DAYS
+
 INSTALLED_APPS = (
     "django.contrib.auth",
     "django.contrib.contenttypes",

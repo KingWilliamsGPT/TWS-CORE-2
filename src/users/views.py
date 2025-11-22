@@ -25,6 +25,10 @@ from rest_framework.exceptions import (
     NotFound,
     AuthenticationFailed,
 )
+from rest_framework import parsers
+from rest_framework.parsers import MultiPartParser, FormParser, FileUploadParser
+from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiExample
+from drf_spectacular.types import OpenApiTypes
 from countries_plus.models import Country
 
 # local imports
@@ -52,6 +56,9 @@ from src.users.serializers import (
     KycVerificationSerializer,
     TFA_Serializer,
     WaitListSerializer,
+    OTP_Serializer,
+    GetOboardingTokenSerializer,
+    Onboarding,
 )
 from src.common.helpers import GetFrontendLink
 from src.common.clients import zeptomail
@@ -119,6 +126,9 @@ class AuthRouterViewSet(viewsets.GenericViewSet):
         "do_kyc_check": KycVerificationSerializer,
         "health": EmptySerializer,
         "join_waitlist": WaitListSerializer,
+        "get_onboarding_token": GetOboardingTokenSerializer,
+        "set_username": Onboarding.ChangeUserNameSerializer,
+        "set_profile_picture": Onboarding.ChangeProfilePictureSerializer,
     }
     permissions = {
         "default": [IsVerifiedUser],
@@ -137,7 +147,11 @@ class AuthRouterViewSet(viewsets.GenericViewSet):
         "get_states": (AllowAny,),
         "send_forgot_password_otp": (AllowAny,),
         "reset_forgot_password": (AllowAny,),
+        "get_onboarding_token": (AllowAny,),
+        "set_username": (AllowAny,),
+        "set_profile_picture": (AllowAny,),
     }
+   
 
     def get_serializer_class(self):
         return self.serializers.get(self.action, self.serializers["default"])
@@ -334,6 +348,105 @@ class AuthRouterViewSet(viewsets.GenericViewSet):
         )
 
         return Response(CreateUserSerializer(user).data, status=status.HTTP_201_CREATED)
+    
+    @action(detail=False, methods=["post"], url_path="onboarding/get_onboarding_token")
+    def get_onboarding_token(self, request):
+        """Get onboarding token for user to continue onboarding process.
+        
+        This only works as long as the user onboarding is not complete.
+
+        **TOKEN EXPIRES IN 2 DAYS**
+        """
+        serializer = self.get_serializer_class()(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        email = serializer.validated_data["email"]
+        password = serializer.validated_data["password"]
+        user = User.objects.filter(email=email).first()
+        if user is None:
+            raise NotFound({"error": "user with this email does not exist"})
+        if not user.check_password(password):
+            raise ValidationError({"error": "invalid password"})
+        if user.is_onboarding_completed():
+            raise ValidationError({"error": "user onboarding is already completed"})
+        onboarding_token = user.get_onboarding_token()
+        return Response(
+            {
+                "onboarding_token": onboarding_token,
+                "onboarding_status": user.onboarding_status,
+                "onboarding_flow": user.get_onboarding_flow(),
+            }, status=status.HTTP_200_OK
+        )
+    
+    @action(detail=False, methods=["post"], url_path="onboarding/set_username")
+    def set_username(self, request):
+        """Change username during onboarding process.
+        
+        This only works as long as the user onboarding is at the username step.
+        **TOKEN EXPIRES IN 2 DAYS**
+        """
+        serializer = self.get_serializer_class()(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        onboarding_token = serializer.validated_data["onboarding_token"]
+        new_username = serializer.validated_data["new_username"]
+        user_id = User.verify_tfa_token(onboarding_token, max_age=settings.ONBOARDING_TOKEN_EXPIRY_TIME_SECONDS)
+        if not user_id:
+            raise ValidationError({"error": "invalid or expired onboarding token"})
+        user = User.objects.filter(id=user_id).first()
+        if user is None:
+            raise NotFound({"error": "user not found"})
+        
+        if user.is_onboarding_completed():
+            raise ValidationError({"error": "user onboarding is already completed"})
+
+        if user.is_future_step(step=User.OnboardingStatus.NEEDS_PROFILE_USERNAME):
+            raise ValidationError({"error": "user is not at the username onboarding step"})
+        
+        user.username = new_username
+        user.advance_onboarding(User.OnboardingStatus.NEEDS_PROFILE_USERNAME)
+        user.save(update_fields=["username", "onboarding_status"])
+        return Response(
+            CreateUserSerializer(user, context={'request': request}).data, 
+            status=status.HTTP_200_OK
+        )
+    
+    @extend_schema(
+        request=Onboarding.ChangeProfilePictureSerializer,
+        responses={200: CreateUserSerializer}
+    )
+    @action(detail=False, methods=["post"], url_path="onboarding/set_profile_picture",  parser_classes=[MultiPartParser, FormParser, FileUploadParser])
+    def set_profile_picture(self, request):
+        """Upload profile picture during onboarding process.
+        
+        This only works as long as the user onboarding is at the profile picture step.
+        **TOKEN EXPIRES IN 2 DAYS**
+        """
+        serializer = self.get_serializer_class()(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        onboarding_token = serializer.validated_data["onboarding_token"]
+        profile_picture = serializer.validated_data["profile_picture"]
+        
+        user_id = User.verify_tfa_token(onboarding_token, max_age=settings.ONBOARDING_TOKEN_EXPIRY_TIME_SECONDS)
+        if not user_id:
+            raise ValidationError({"error": "invalid or expired onboarding token"})
+        
+        user = User.objects.filter(id=user_id).first()
+        if user is None:
+            raise NotFound({"error": "user not found"})
+        
+        if user.is_onboarding_completed():
+            raise ValidationError({"error": "user onboarding is already completed"})
+        
+        if user.is_future_step(step=User.OnboardingStatus.NEEDS_PROFILE_PICTURE):
+            raise ValidationError({"error": "user is not at the profile picture onboarding step"})
+        
+        user.profile_picture = profile_picture
+        user.advance_onboarding(User.OnboardingStatus.NEEDS_PROFILE_PICTURE)
+        user.save(update_fields=["profile_picture", "onboarding_status"])
+        return Response(
+            CreateUserSerializer(user, context={'request': request}).data, 
+            status=status.HTTP_200_OK
+        )
+        
 
     @action(detail=False, methods=["post"], throttle_classes=[OtpRateThrottle], url_path="email/send_email_verification_otp")
     def send_email_verification_otp(self, request):
@@ -411,13 +524,12 @@ class AuthRouterViewSet(viewsets.GenericViewSet):
             serializer = TFA_Serializer(data=request.data)
             serializer.is_valid(raise_exception=True)
             tfa_token = serializer.validated_data["tfa_token"]
-            user_id = verify_signed_token(tfa_token, max_age=300)
-            if not user_id or "///" not in user_id:
+            user_id = User.verify_tfa_token(tfa_token)
+            if not user_id:
                 raise AuthenticationFailed(
                     "Invalid or expired tfa token was provided",
                     "invalid_tfa_token",
                 )
-            user_id = user_id.split("///")[0]
             user = User.objects.filter(id=user_id).first()
             if not user:
                 raise NotFound({"error": "user not found"})

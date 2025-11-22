@@ -181,6 +181,7 @@ class TokenPairView__FirstFactor(TokenObtainPairView):
                     "details": {
                         "onboarding_status": user.onboarding_status,
                         "onboarding_flow": user.get_onboarding_flow(),
+                        "onboarding_token": user.get_onboarding_token(),
                     },
                     "code": "onboarding_incomplete",
                 }
@@ -189,10 +190,7 @@ class TokenPairView__FirstFactor(TokenObtainPairView):
         if not user.two_factor_enabled:
             return _jwt_response(serializer)
 
-        nonce = f"///{secrets.token_hex(10)}"
-        signed_token = generate_signed_token(str(user.id) + nonce)
-
-        return Response({"tfa_token": signed_token}, status=status.HTTP_200_OK)
+        return Response({"tfa_token": user.get_tfa_token()}, status=status.HTTP_200_OK)
 
 @extend_schema(tags=["auth"])
 class TokenPairView__SecondFactor(TokenViewBase):

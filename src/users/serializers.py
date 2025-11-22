@@ -1,8 +1,11 @@
 from rest_framework import serializers
 from django.core.validators import validate_email
 from django.core.exceptions import ValidationError
-from phonenumber_field.phonenumber import to_python
 from phonenumber_field.serializerfields import PhoneNumberField
+from drf_spectacular.utils import extend_schema_serializer, OpenApiExample
+from drf_spectacular.types import OpenApiTypes
+from drf_spectacular.utils import extend_schema_field
+from phonenumber_field.phonenumber import to_python
 from countries_plus.models import Country
 
 from src.common.serializers import ThumbnailerJSONSerializer
@@ -204,6 +207,10 @@ class CreateUserSerializer(serializers.ModelSerializer):
     onboarding_flow = serializers.SerializerMethodField()
     def get_onboarding_flow(self, obj):
         return obj.get_onboarding_flow()
+    
+    onboarding_token = serializers.SerializerMethodField()
+    def get_onboarding_token(self, user):
+        return user.get_onboarding_token()
 
     def create(self, validated_data):
         # call create_user on user object. Without this
@@ -234,6 +241,7 @@ class CreateUserSerializer(serializers.ModelSerializer):
             "is_phone_number_verified",
             "is_liveness_check_verified",
             "is_bvn_verified",
+            "onboarding_token",
         )
         read_only_fields = (
             # 'tokens',
@@ -245,6 +253,7 @@ class CreateUserSerializer(serializers.ModelSerializer):
             "is_liveness_check_verified",
             "is_bvn_verified",
             "country_registered_with",
+            "onboarding_token",
         )
         extra_kwargs = {
             "password": {"write_only": True},
@@ -298,3 +307,28 @@ class TFA_Serializer(serializers.Serializer):
 
 class TFA_OtpSerializer(TFA_Serializer):
     otp = serializers.CharField(max_length=10, write_only=True)
+
+
+class OTP_Serializer(serializers.Serializer):
+    otp = serializers.CharField(max_length=10, write_only=True)
+
+
+class GetOboardingTokenSerializer(serializers.Serializer):
+    password = serializers.CharField(max_length=500, write_only=True)
+    email = serializers.EmailField(write_only=True)
+    onboarding_token = serializers.CharField(max_length=500, read_only=True)
+
+
+
+class Onboarding:
+    class UseOnboardingTokenSerializer(serializers.Serializer):
+        onboarding_token = serializers.CharField(max_length=500, write_only=True)
+    class ChangeUserNameSerializer(UseOnboardingTokenSerializer):
+        new_username = serializers.CharField(max_length=150, write_only=True)
+    
+    class ChangeProfilePictureSerializer(UseOnboardingTokenSerializer):
+        @extend_schema_field(OpenApiTypes.BINARY)
+        class ProfilePictureField(serializers.ImageField):
+            pass
+        
+        profile_picture = ProfilePictureField(required=True)
