@@ -203,6 +203,14 @@ class OnboardingMixin:
 
         if from_step:
             flow = self.get_onboarding_flow()
+            
+            if from_step not in flow:
+                raise ValidationError({
+                    "error": f"Step {from_step} is not valid for {self.user_type} user type",
+                    "onboarding_status": self.onboarding_status,
+                    "onboarding_flow": flow,
+                })
+            
             from_step_index = flow.index(from_step)
             current_index = flow.index(self.onboarding_status)
             if from_step_index < current_index:

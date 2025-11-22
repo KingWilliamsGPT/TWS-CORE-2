@@ -342,7 +342,7 @@ class Onboarding:
             choices=User.UserType.choices, write_only=True
         )
 
-    class SetUserLocationSerializer(serializers.ModelSerializer):
+    class SetUserLocationSerializer(UseOnboardingTokenSerializer):
         country = CountrySerializer(read_only=True)
         country_id = serializers.SlugRelatedField(
             slug_field="iso",
@@ -351,12 +351,4 @@ class Onboarding:
             write_only=True,
             required=False,
         )
-
-        class Meta:
-            model = User
-            fields = (
-                "id",
-                "country",
-                "country_id",
-                "state",
-            )
+        state = serializers.CharField(max_length=100, write_only=True, required=False)

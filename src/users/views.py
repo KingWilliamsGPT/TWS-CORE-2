@@ -410,6 +410,7 @@ class AuthRouterViewSet(viewsets.GenericViewSet):
             )
 
         user.user_type = user_type
+        user.onboarding_status = User.OnboardingStatus.NEEDS_USER_TYPE  # Reset to this step
         user.advance_onboarding(User.OnboardingStatus.NEEDS_USER_TYPE)
         user.save(update_fields=["user_type", "onboarding_status"])
 
@@ -566,6 +567,11 @@ class AuthRouterViewSet(viewsets.GenericViewSet):
 
         if user.is_email_verified:
             raise ValidationError({"error": "User email already verified"})
+        
+        if user.is_future_step(step=User.OnboardingStatus.NEEDS_EMAIL_VERIFICATION):
+            raise ValidationError(
+                {"error": "user is not at the email verification onboarding step"}
+            )
 
         UserService.send_user_otp(user, type=OtpType.EMAIL_VERIFICATION)
         return Response({"otp": "otp sent to your email"}, status=status.HTTP_200_OK)
@@ -600,6 +606,11 @@ class AuthRouterViewSet(viewsets.GenericViewSet):
 
         if user.is_phone_number_verified:
             raise ValidationError({"error": "User phone number already verified"})
+    
+        if user.is_future_step(step=User.OnboardingStatus.NEEDS_PHONE_VERIFICATION):
+            raise ValidationError(
+                {"error": "user is not at the phone number verification onboarding step"}
+            )
 
         UserService.send_user_otp(user, type=OtpType.PHONE_VERIFICATION)
         return Response(
@@ -679,6 +690,11 @@ class AuthRouterViewSet(viewsets.GenericViewSet):
 
         if user.is_email_verified:
             raise ValidationError({"error": "User email already verified"})
+        
+        if user.is_future_step(step=User.OnboardingStatus.NEEDS_EMAIL_VERIFICATION):
+            raise ValidationError(
+                {"error": "user is not at the email verification onboarding step"}
+            )
 
         if UserService.verify_user_otp(user, otp, type=OtpType.EMAIL_VERIFICATION):
             return Response(
@@ -728,6 +744,11 @@ class AuthRouterViewSet(viewsets.GenericViewSet):
 
         if user.is_phone_number_verified:
             raise ValidationError({"error": "User phone number already verified"})
+
+        if user.is_future_step(step=User.OnboardingStatus.NEEDS_PHONE_VERIFICATION):
+            raise ValidationError(
+                {"error": "user is not at the phone verification onboarding step"}
+            )
 
         if UserService.verify_user_otp(user, otp, type=OtpType.PHONE_VERIFICATION):
             return Response(
